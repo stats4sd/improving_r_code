@@ -1,0 +1,331 @@
+---
+title: "Some advice and tips for getting more out of R, and improving your code, analysis and output"
+format: html
+editor: visual
+execute: 
+  warning: false
+  message: false
+---
+
+## Objectives and summary of session
+
+I have some data from a very standard experimental design and want to do some analysis in R. We have an RCBD (Randomised Complete Block Design) with 13 varieties of oats in 5 blocks (coded as "A"-"M"), which was repeated in two locations, over three seasons. I can 'do' my analysis in a very quick and dirty few lines of code... like this!
+
+```
+oats_data<-read.csv("oats.csv")
+
+boxplot(yield~gen,oats_data)
+
+library(tidyverse)
+
+oats_data %>%
+  group_by(env,year,gen) %>%
+  summarise(mean(yield))
+
+lm(yield~gen*year*env,data=oats_data) %>%
+anova()
+
+```
+
+Hurray we have done our analysis!
+
+Only it is actually incorrect, has some pretty messy output, is hard to interpret and share with others, and we kind of don't really understand what we have done of what is really going on in the data. If all we care about is getting some (wrong) p-values then this is OK I suppose; but we can do a whole lot better!
+
+The main objective in this guide is to go through some helpful tips and tricks for using R, that you may not have been taught about when learning R. Pretty much nothing that is covered in this guide is "essential" to the successful usage of R - but everything covered will improve your own understanding of your analysis, improve the quality of your outputs and reduce the amount of time you spend manually tidying up your tables/graphs/reports and help you to build reproduceable and well documented script files. 
+
+Hopefully for many of you the design and analysis we are talking about here, with a multi-season multi-location multi-variety experiment, is quite a familiar one. The idea here is that we have a relatively standard problem, but with enough complexity to make it at least somewhat realistic, to try to put the focus away from the stats and more on some tips and tricks of working with R. And if it is not familiar then this is also not a problem, nearly everything we are going to talk about will be relevant to anyone using R, regardless of what sort of data or analysis you do happen to be working with!
+
+My general workflow for this analysis is pretty straightforward - I will bring in the data, make some summary statistics and exploratory plots, fit a model, consider a few options for models, and make some inferences from the model. 
+
+Since my main focus here is on other things, the 'analysis' code I am using here in this example is in no way meant to be an exhaustive set of everything that I might want to do with this data. But maybe the first initial headline analysis I am working on.
+
+
+## Summary of the Main Tips/Tricks Covered In This Session (with links to resources)
+
+1.  Organisation of data and code - keep data clean, structured and tidy. Keep code clean, structured and tidy. Keep R updated. Use project files. "What They Forgot to Teach You About R" - https://rstats.wtf/
+
+2.  Modifying plots to make them more better or more interpretable often requires modifying the *data*; not just the plot- e.g. we will demonstrate use of `reorder()` https://r-graphics.org/chapter-dataprep
+
+3.  Making tables or output look cleaner and more presentable using `gt()` so it looks like a table not just a code dump https://gt.albert-rapp.de/
+
+4.  A classic trap to avoid - making sure coded factors are not misinterpreted as numbers https://stats4sd.org/blog/22
+
+5.  Flexible post-hoc analysis of models with `emmeans()` - same code will work on hundreds of different types of model. Not limited in the way that most equivalent packages are. https://aosmith.rbind.io/2019/03/25/getting-started-with-emmeans/
+
+6.  Making good use of markdown documents - writing explanations not just shorthand comments; resizing plots; using formatting options. Build the report as you working on the analysis - easier to share, update and reproduce. https://www.rstudio.com/wp-content/uploads/2015/02/rmarkdown-cheatsheet.pdf
+
+## Preliminaries - Loading in the data
+
+```{r}
+oats_data<-read.csv("oats.csv")
+```
+
+Before we get started properly let's take a quick look at the data which was pulled from the `shaw.oats` data frame within the `agridat` library. I've written the code above to be a bit more realistic in a workflow - assuming we are pulling in data from another file - but if you want to follow along with the code you can load in the data directly from the agridat library instead: `oats_data<-data("shaw.oats")`
+
+An oat trial in India of 11 hybrid oats compared to 2 established high-yielding varieties, labelled L and M. The trial was conducted at 2 locations. The size and exact locations of the plots varied from year to year.
+
+At Pusa, the crop was grown without irrigation. At Karnal the crop was given 2-3 irrigations. Five blocks were used, each plot 1000 square feet. In 1932, variety L was high-yielding at Pusa, but low-yielding at Karnal.
+
+Shaw used this data to illustrate ANOVA for a multi-environment trial.
+
+```{r}
+head(oats_data)
+```
+
+Source F.J.F. Shaw (1936). A Handbook of Statistics For Use In Plant Breeding and Agricultural Problems. The Imperial Council of Agricultural Research, India. https://archive.org/details/HandbookStatistics1936/page/n12 P. 126
+
+The data is in a clean single rectangle, with short headers than are easily understood and written consistently (all lower case single words).
+
+
+## Tip 1 - Working on Your Setup
+
+As a starting point, if you are not already using RStudio instead of 'just' R, because that is what your professor taught you, then you should definitely be using RStudio! 
+
+And as a next step - if you are not already using project files as a way of organising together data, scripts, packages and outputs linked to a single common analysis project then you should definitely be using project files.
+
+If you find yourself annoyed when you realise that the code your colleague has sent has lots of lines of code like. `read.csv("C:/Users/MyComputer/MyFolder/AnotherFolder/TheFile.csv)` which will need to be modified every time it is run on a different system then project files could be for you! You will only ever need to see code that looks like `read.csv("TheFile.csv")` as long as you set up your project correctly.
+
+And if you are used to using .R files, then you should probably get also start to get used to using .Rmd or .Qmd files. These markdown formats can help you break up your analysis more intuitively, give better space for self-documenting rather than relying on comments, and give you the outputs in line with the code. It makes your coding and analysis part of the same flow, rather than separating them out.
+
+Part of the setup process is also thinking about package management. Don't load the package as and when you need it within your script. If it starts getting long then you can quickly lose track and annoy/confuse other people who are following along with your code. I am going to use all of these packages at some point. I did not know exactly which packages I would be using when I started writing this script.
+
+But whenever I found that I needed another package I came back to this point and added it in up in this chunk.
+
+```{r}
+library(tidyverse)
+
+library(emmeans)
+library(multcomp)
+
+library(gt)
+
+```
+
+For those wanting to take their version control and package management onto the next level - this is where you might start exploring git or renv. These are really useful tools to know about, and in particular if you are going to be working within a team rather than on your own, once you have got to grips with the basics of using R. Some reference links here for you to start exploring more for Git: https://r-bio.github.io/intro-git-rstudio/ and for renv : https://rstudio.github.io/renv/articles/renv.html 
+
+## Tip 2 - Improving Exploratory Plots
+
+Let's start with a quick plot of the overall treatment distributions with some boxplots
+
+
+```{r}
+oats_data %>%
+  ggplot(aes(y=gen,x=yield))+
+    geom_boxplot()
+```
+
+Initial inspection shows a few higher yielding varieties jumping out, but the main distinction being one much lower yielding variety from out of the list of 13. But the trends are a little hard to spot, since the coding of genotypes from "A" to "M" is largely arbitrary - it is fairly rare in data analysis for alphabetical order to actually be the most intuitive or informative option for display.
+
+What might be nicer here is if we turn this into a "caterpillar" style box plot where the genotypes are ordered not by name (which is totally arbitrary) but by average yield. This is an example of something where to change the plot we actually have to change the data.
+
+A categorical axis is always presented in alphabetical order (if the underlying variable is a character) or in factor level order (if the underlying variable is a factor). By default factor level order will also be alphabetical - but this can be changed (unlike a character variable which will always be in alphabetical order).
+
+This is where piping into the plot becomes very nice - we may not want to change our underlying dataset but for the purpose of the plot we want to have a reordered version of gen. The reorder() function works fairly intuitively - first give the name of the categorical variable and then the name of the variable to set the order by. By default it will order by the mean values, but you can also change this to be by any summary value, e.g. if you wanted to order by maximum `max`, minimum `min`, median `median`, frequency `length` etc.
+
+```{r}
+oats_data %>%
+  mutate(gen=reorder(gen,yield)) %>%
+  ggplot(aes(y=gen,x=yield))+
+    geom_boxplot()
+```
+Picking out the "High" and the "Low" yielding genotypes here is now quite a lot easier, as well as seeing how that group of higher yielding genotypes all do appear to have quite similar distributions.
+
+If you wanted the caterpillar the other way around - highest on bottom lowest on top there are a few options of how you could solve that issue with slightly sneaky data tricks e.g.add an extra call to factor and reverse the levels, change the call to reorder to order based on -1*yield instead of yield. But in this instance probably the simplest way to switch is through using a call to `scale_y_discrete(limits=rev)` - again a very useful trick that is often overlooked! This time it is modifying the plot itself, rather than the data to reverse the order of the axis.
+
+```{r}
+oats_data %>%
+  mutate(gen=reorder(gen,yield)) %>%
+  ggplot(aes(y=gen,x=yield))+
+     geom_boxplot() +
+      scale_y_discrete(limits=rev)
+```
+
+Remember when piping from the data into a plot that no changes are made to the underlying data - if I wanted to make a more permanent change to the order of my variables I would need to assign the updated data to a new object - in this case I will over-write my existing data set. It is always worth thinking carefully about doing this! But the advantage of having this reproducible script file is that if I do make a mistake I can just start again from the top of my code.
+
+```{r}
+oats_data<-mutate(oats_data,gen=reorder(gen,yield))
+```
+
+
+## Tip 3 - Making Table Look a Bit Nicer In Our Reports
+
+Of course I have multiple locations and multiple years in this data set, and this is something I should account for in my analysis.
+So I might want a three way table looking at the values by site and location. I can get lots of lovely summary statistics by using group_by and summarise:
+
+(Note that the order of genotypes is now based from overall lowest mean to overall highest based on the previous code.)
+
+```{r}
+oats_data %>%
+  group_by(env,year,gen) %>%
+   summarise(n=n(),mean=mean(yield),sd=sd(yield))
+```
+
+But this output is kind of overwhelming and definitely not the most efficient way of presenting this information with a 78 row table with far too many decimals and lots of repeated values and labels!
+
+There are built in functions to make 'pretty' summary tables - but usually I find I want a bit more control over exactly what is included and how it is laid out so it is really useful to know how to manipulate tables into the shape you want in R and present them nicely. It will save you a lot of time in the future - especially if you have ever found yourself copy-pasting numbers from R output into tables (please never ever do this, it will make me sad).
+
+So it is useful to know how to build something yourself - `pivot_` can be very powerful here for modifying the content and shape within R. I am going to ask it to reshape my data and have one column for each statistic in each year. This will give me a more manageable set of dimensions. I am going to assign it to an object called table0, since I will be re-using this initial summary table later on as the basis for a more presentable looking table.
+
+```{r}
+table0<-oats_data %>%
+  group_by(env,year,gen) %>%
+   summarise(mean=mean(yield),sd=sd(yield)) %>%
+        pivot_wider(names_from = year,values_from = c(mean,sd))
+
+table0
+```
+
+On it's own this still is a bit overwhelming but it is now in a better position to tidy up!. 
+
+Lots of functions now exist to improve appearance of tables; although it is an area of ongoing development so there are a lot of different options out there. I think the best to learn about would probably be the `gt()` package - it is designed as a "grammar of tables" similar to how ggplot is the "grammar of graphs" and developed by the RStudio team. Outputting a table into HTML/PDF/Word using gt will make it look a whole lot nicer, and the basic functionality is very simple to use.
+
+If you just want the table to "look like a table" when you output your results, rather than "looking like R output", then the syntax is very very simple!
+
+```{r}
+table0 %>% 
+  gt()
+
+```
+
+Because `table0` was grouped by env using `group_by` in a previous step the output has carried these groups forward - you can see the separation of sections for the 2 locations. 
+If the data wasn't grouped before piping into gt, the groups could also have been added using the groupname_col= argument -  `gt(groupname_col = "env")` instead
+
+It is also worth spending a bit of time to learn other `gt` functions to make your table 'presentation' ready using formats, spanners, groups, and labels and you can quickly start to create a much more 'human-readable' looking piece of output.
+
+```{r}
+table1<-table0 %>%
+         gt() %>%
+           fmt_number(decimals=1)
+table1
+```
+
+And bring lets now bring in 'spanners' for each year to organise the structure a little more. The terminology of 'spanner' may be unfamiliar, and perhaps a little unintuitive here, but from looking at the output it should immediately become clear what this means when you see the result:
+
+```{r}
+table2<-table1 %>%
+    tab_spanner(label="1932",columns=contains("1932"))%>%
+    tab_spanner(label="1933",columns=contains("1933")) %>%
+    tab_spanner(label="1934",columns=contains("1934")) 
+
+table2
+```
+
+Then there are some nice functions for tidying things up with the labels, titles and styles. Since it is perfectly balanced trial with n=5 for all treatments in all environment/season combinations I will only put this in once for my final table in the subheader.
+```{r}
+table2 %>%
+    cols_label(contains("mean")~"Mean",
+               contains("sd")~"SD",
+               "gen"="Genotype")%>%
+           tab_header("Oat Yield (kg/ha), Mean (SD)",subtitle = "RCBD design; n=5 blocks per site per season") %>%
+       opt_stylize(style = 3, color = 'gray')
+```
+
+See: https://gt.albert-rapp.de/getting_started for more.
+
+## Tip 4 - Make sure you know your data, and know what to expect in your output
+
+I am going to fit a standard ANOVA model with a 3 way interaction between genotype and year and environment. As a quick aside, for those not aware, R makes no real distinction in what functions you use between an "ANOVA" or an "ANCOVA" or a "Multiple Linear Regression" - all of these are just different names for applying a standard linear model - lm(). And using the lm/glm/lmer family of functions in R gives us a whole lot more flexibility without getting bogged down in how to 'name' a particular model we can describe exactly how we want it to work - extending it very easily to all sorts of non-Gaussian link functions or different forms of hierarchical or longitudinal models. 
+
+In practice my advice is that I have never yet really found an instance where `aov()` would ever be my choice over `lm()` or `lmer()` - although I am sure many people may have been taught to use it when learning about statistics in R.
+
+```{r}
+model1<-lm(yield~gen*year*env,data=oats_data)
+
+summary(model1)
+
+anova(model1)
+```
+
+I can fit my model and use `summary()` and `anova()` to get most of the sort of output I might be interested in. Everything runs - no errors - lots of highly significant p-values.
+
+But does anything look a bit odd here...? 
+Because it should!
+
+The model is incorrect, and absolutely not what I wanted, but unless we knew *why* it would not be particularly obvious from what we have done here.
+
+Take a closer look at the model coefficients - the intercept of the model is -1900. There are some outrageously large looking estimates for some of the parameters when you go back and compare against the data where the range of yields goes from 15 to 65.
+
+The real give away is in the number of parameters, and degrees of freedom for `year` variable. This is being treated as if it is a continuous number  I.e. it is assessing for a 'one unit' increase in year what would we expect to happen to yield. In reality, we would unquestionably be more interested in considering year as a factor for this analysis - considering each year as a separate group.
+
+The class of variable when it is used in a model is important! It will determine how it is being treated.
+
+Let's just look at one site to show just how difference the models are here. It is very worthwhile being comfortable with basic data manipulation and plotting functions so you can start to explore your data in all sorts of different ways if and when you see something a little odd or unexpected.
+
+```{r}
+oats_data %>%
+  filter(gen=="M" & env=="Karnal") %>%
+  group_by(year) %>%
+  summarise(yield=mean(yield)) %>%
+    ggplot(aes(y=yield,x=year))+
+    geom_point(data=filter(oats_data,gen=="M" & env=="Karnal")) +
+  geom_line(col="red")+
+  geom_smooth(method="lm",col="blue",se=FALSE)
+```
+
+The blue line is what is being fitted in the previous model - considering the year on year trend as a linear effect. But for genotype A this is very inappropriate! It reduced from 1932-33 and then increased from 1933-34 - very much not a linear effect. And with just 3 years we would be incredibly stupid to even consider fitting a non-linear effect of year.
+
+So with a trial like this we are not interested in looking at the year on year trend as a continuous trend - we are considering the three years as being representative of different environmental conditions. Even though year is a number we do not want to treat it as such - instead we should be treating it as a factor. Even though we created a model with no errors/warnings and lots of significant p-values, it was ultimately completely useless.
+
+So let's try again:
+
+```{r}
+oats_data<-mutate(oats_data,year_factor=factor(year))
+
+model2<-  lm(yield~gen*year_factor*env,data=oats_data)
+
+summary(model2)
+
+anova(model2)
+```
+
+
+The output should look pretty different here!
+
+Everything is significant... For a proper analysis of this data I would probably start checking model assumptions, and that would lead me to wanting to extend this model to also account for the blocking effect using a mixed model.
+But to keep things a bit more straightforward within this session today, I will temporarily forget about this for now, as we want to keep today a little bit more R-focused than stats-focused!
+
+But that does mean I should at least try to make sense of this model we have got to and working out why everything is statistically significant - and in particular that 3 way interaction. Multi-way interactions can be quite tricky to unpack, so we need all the help we can get from R!
+
+## Tip 5 - Using the emmeans package for interrogating models
+
+When we have a model like this with lots of interactions it can be a bit confusing to unpack. The emmeans package has lots of ways of interrogating models for various post-hoc statistics and summaries.
+
+e.g. we can start out looking at the overall means / CIs.
+
+Since we have a balanced experiment the means should match what we saw back in the table we made earlier - but the confidence intervals will now be calculated in a much more robust way than if we had calculated them in a naive way. (Of course that is providing the model assumptions are valid - but that is probably a discussion for another time!). 
+
+```{r}
+emmeans(model2,~gen) 
+```
+`emmip()` can be very flexible to give different layouts for "Interaction plots" with different factors used in different ways depending on how we use the \~ \| and \* . It takes a bit of trial and error but it can be really useful to see the same information presented in different ways and is usually easier than trying to work out the ggplot code yourself at this point
+
+```{r}
+emmip(model2,~gen | year_factor*env) 
+```
+
+I don't think this is quite what I wanted, but can try a bit of trial and error of moving things around in the order to put the same numbers in a plot which can help me understand this 3 way interaction a little better!
+
+I think to me this is maybe the most helpful layout for helping to see why we are seeing interactions
+
+```{r}
+emmip(model2,year_factor~gen |env,CIs=TRUE) 
+```
+
+It shows why we have 2 way interactions:
+- Year * Env -> Pusa 1932 is much lower yielding than other 2 years; Karnal 1932 generally similar to other years.
+- Env * Gen -> Relatively small effect - generally those higher yield varieties are consistent from one site to another
+- Year * Gen -> In both sites the differences between genotypes across years are larger for the higher yielding genotypes and smaller for the lower yielding genotypes.
+
+And some of the causes behind the 3 way interaction:
+- Genotype L is the main culprit here - in 1932 Low Yielding in Karnal and High Yielding in Pusa; In 1933 High Yielding in Karnal and Average Yielding in Pusa; In 1934 Above Average for Both Sites. F, C, I and M also playing a role in the 3 way interaction.
+
+The complicated multi-way interaction effect is being driven by variety L which is very different to anything else. In Karnal this is one of the best in 1933 and one of the worst in 1932. In Pusa this is by far the best in 1932 and among the best in 1933. So there is a three way effect there given this inconsistency between the two sites of the effect over the two years. We also see other things clearly - like the big year to year difference in Pusa, and only a small difference in Karnal, and that there are a good number of 'consistently bad' varieties that we can probably safely discard from further research.
+
+So we know have more of an understanding behind the 'headlines' that came through our analysis of variance table, and can start to talk about why all those interactions are coming out so strongly
+
+
+## Tip 6 - Making Everything Look A Bit Nicer!
+
+This is something I have been trying to embed throughout this entire document by the way I am structuring my code chunks, the options I am using for plots, and the R markdown stylings I am using throughout. Throughout this document there are embedded things to make the output and structure easier to follow - like headers (using `#`), bullet points (using `-`) and making sure code is nicely laid out.
+
+All of these small changes make this document much easier to read, and to share the results and findings among your team (particularly those who are not R users, who would be turned off by raw computer output) so that it can be understood well. There are lots of great resources for reminding yourself of the notation in R markdown documents for different types of formatting, and there is also the option to use the relatively new "visual" code editor in RStudio if you do prefer to produce your documents code in that way.

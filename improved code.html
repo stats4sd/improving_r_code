@@ -1,0 +1,3465 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.3.450">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>Trying to get the most out of R</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="improved code_files/libs/clipboard/clipboard.min.js"></script>
+<script src="improved code_files/libs/quarto-html/quarto.js"></script>
+<script src="improved code_files/libs/quarto-html/popper.min.js"></script>
+<script src="improved code_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="improved code_files/libs/quarto-html/anchor.min.js"></script>
+<link href="improved code_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="improved code_files/libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="improved code_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="improved code_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="improved code_files/libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
+
+
+</head>
+
+<body class="fullcontent">
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Trying to get the most out of R</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+</header>
+
+<section id="objectives-and-summary-of-session" class="level2">
+<h2 class="anchored" data-anchor-id="objectives-and-summary-of-session">Objectives and summary of session</h2>
+<p>I have some data from a very standard experimental design and want to do some analysis in R. We have an RCBD (Randomised Complete Block Design) with 13 varieties of oats in 5 blocks (coded as “A”-“M”), which was repeated in two locations, over three seasons. I can ‘do’ my analysis in a very quick and dirty few lines of code… like this!</p>
+<pre><code>oats_data&lt;-read.csv("oats.csv")
+
+boxplot(yield~gen,oats_data)
+
+library(tidyverse)
+
+oats_data %&gt;%
+  group_by(env,year,gen) %&gt;%
+  summarise(mean(yield))
+
+lm(yield~gen*year*env,data=oats_data) %&gt;%
+anova()
+</code></pre>
+<p>Hurray we have done our analysis!</p>
+<p>Only it is actually incorrect, has some pretty messy output, is hard to interpret and share with others, and we kind of don’t really understand what we have done of what is really going on in the data. If all we care about is getting some (wrong) p-values then this is OK I suppose; but we can do a whole lot better!</p>
+<p>The main objective in this guide is to go through some helpful tips and tricks for using R, that you may not have been taught about when learning R. Pretty much nothing that is covered in this guide is “essential” to the successful usage of R - but everything covered will improve your own understanding of your analysis, improve the quality of your outputs and reduce the amount of time you spend manually tidying up your tables/graphs/reports and help you to build reproduceable and well documented script files.</p>
+<p>Hopefully for many of you the design and analysis we are talking about here, with a multi-season multi-location multi-variety experiment, is quite a familiar one. The idea here is that we have a relatively standard problem, but with enough complexity to make it at least somewhat realistic, to try to put the focus away from the stats and more on some tips and tricks of working with R. And if it is not familiar then this is also not a problem, nearly everything we are going to talk about will be relevant to anyone using R, regardless of what sort of data or analysis you do happen to be working with!</p>
+<p>My general workflow for this analysis is pretty straightforward - I will bring in the data, make some summary statistics and exploratory plots, fit a model, consider a few options for models, and make some inferences from the model.</p>
+<p>Since my main focus here is on other things, the ‘analysis’ code I am using here in this example is in no way meant to be an exhaustive set of everything that I might want to do with this data. But maybe the first initial headline analysis I am working on.</p>
+</section>
+<section id="summary-of-the-main-tipstricks-covered-in-this-session-with-links-to-resources" class="level2">
+<h2 class="anchored" data-anchor-id="summary-of-the-main-tipstricks-covered-in-this-session-with-links-to-resources">Summary of the Main Tips/Tricks Covered In This Session (with links to resources)</h2>
+<ol type="1">
+<li><p>Organisation of data and code - keep data clean, structured and tidy. Keep code clean, structured and tidy. Keep R updated. Use project files. “What They Forgot to Teach You About R” - https://rstats.wtf/</p></li>
+<li><p>Modifying plots to make them more better or more interpretable often requires modifying the <em>data</em>; not just the plot- e.g.&nbsp;we will demonstrate use of <code>reorder()</code> https://r-graphics.org/chapter-dataprep</p></li>
+<li><p>Making tables or output look cleaner and more presentable using <code>gt()</code> so it looks like a table not just a code dump https://gt.albert-rapp.de/</p></li>
+<li><p>A classic trap to avoid - making sure coded factors are not misinterpreted as numbers https://stats4sd.org/blog/22</p></li>
+<li><p>Flexible post-hoc analysis of models with <code>emmeans()</code> - same code will work on hundreds of different types of model. Not limited in the way that most equivalent packages are. https://aosmith.rbind.io/2019/03/25/getting-started-with-emmeans/</p></li>
+<li><p>Making good use of markdown documents - writing explanations not just shorthand comments; resizing plots; using formatting options. Build the report as you working on the analysis - easier to share, update and reproduce. https://www.rstudio.com/wp-content/uploads/2015/02/rmarkdown-cheatsheet.pdf</p></li>
+</ol>
+</section>
+<section id="preliminaries---loading-in-the-data" class="level2">
+<h2 class="anchored" data-anchor-id="preliminaries---loading-in-the-data">Preliminaries - Loading in the data</h2>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>oats_data<span class="ot">&lt;-</span><span class="fu">read.csv</span>(<span class="st">"oats.csv"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Before we get started properly let’s take a quick look at the data which was pulled from the <code>shaw.oats</code> data frame within the <code>agridat</code> library. I’ve written the code above to be a bit more realistic in a workflow - assuming we are pulling in data from another file - but if you want to follow along with the code you can load in the data directly from the agridat library instead: <code>oats_data&lt;-data("shaw.oats")</code></p>
+<p>An oat trial in India of 11 hybrid oats compared to 2 established high-yielding varieties, labelled L and M. The trial was conducted at 2 locations. The size and exact locations of the plots varied from year to year.</p>
+<p>At Pusa, the crop was grown without irrigation. At Karnal the crop was given 2-3 irrigations. Five blocks were used, each plot 1000 square feet. In 1932, variety L was high-yielding at Pusa, but low-yielding at Karnal.</p>
+<p>Shaw used this data to illustrate ANOVA for a multi-environment trial.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">head</span>(oats_data)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>   env year block gen yield
+1 Pusa 1932    B1   A  26.5
+2 Pusa 1932    B2   A  38.0
+3 Pusa 1932    B3   A  22.5
+4 Pusa 1932    B4   A  18.0
+5 Pusa 1932    B5   A  22.5
+6 Pusa 1933    B1   A  37.5</code></pre>
+</div>
+</div>
+<p>Source F.J.F. Shaw (1936). A Handbook of Statistics For Use In Plant Breeding and Agricultural Problems. The Imperial Council of Agricultural Research, India. https://archive.org/details/HandbookStatistics1936/page/n12 P. 126</p>
+<p>The data is in a clean single rectangle, with short headers than are easily understood and written consistently (all lower case single words).</p>
+</section>
+<section id="tip-1---working-on-your-setup" class="level2">
+<h2 class="anchored" data-anchor-id="tip-1---working-on-your-setup">Tip 1 - Working on Your Setup</h2>
+<p>As a starting point, if you are not already using RStudio instead of ‘just’ R, because that is what your professor taught you, then you should definitely be using RStudio!</p>
+<p>And as a next step - if you are not already using project files as a way of organising together data, scripts, packages and outputs linked to a single common analysis project then you should definitely be using project files.</p>
+<p>If you find yourself annoyed when you realise that the code your colleague has sent has lots of lines of code like. <code>read.csv("C:/Users/MyComputer/MyFolder/AnotherFolder/TheFile.csv)</code> which will need to be modified every time it is run on a different system then project files could be for you! You will only ever need to see code that looks like <code>read.csv("TheFile.csv")</code> as long as you set up your project correctly.</p>
+<p>And if you are used to using .R files, then you should probably get also start to get used to using .Rmd or .Qmd files. These markdown formats can help you break up your analysis more intuitively, give better space for self-documenting rather than relying on comments, and give you the outputs in line with the code. It makes your coding and analysis part of the same flow, rather than separating them out.</p>
+<p>Part of the setup process is also thinking about package management. Don’t load the package as and when you need it within your script. If it starts getting long then you can quickly lose track and annoy/confuse other people who are following along with your code. I am going to use all of these packages at some point. I did not know exactly which packages I would be using when I started writing this script.</p>
+<p>But whenever I found that I needed another package I came back to this point and added it in up in this chunk.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tidyverse)</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(emmeans)</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(multcomp)</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(gt)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>For those wanting to take their version control and package management onto the next level - this is where you might start exploring git or renv. These are really useful tools to know about, and in particular if you are going to be working within a team rather than on your own, once you have got to grips with the basics of using R. Some reference links here for you to start exploring more for Git: https://r-bio.github.io/intro-git-rstudio/ and for renv : https://rstudio.github.io/renv/articles/renv.html</p>
+</section>
+<section id="tip-2---improving-exploratory-plots" class="level2">
+<h2 class="anchored" data-anchor-id="tip-2---improving-exploratory-plots">Tip 2 - Improving Exploratory Plots</h2>
+<p>Let’s start with a quick plot of the overall treatment distributions with some boxplots</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>oats_data <span class="sc">%&gt;%</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(<span class="fu">aes</span>(<span class="at">y=</span>gen,<span class="at">x=</span>yield))<span class="sc">+</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>    <span class="fu">geom_boxplot</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<p><img src="improved-code_files/figure-html/unnamed-chunk-4-1.png" class="img-fluid" width="672"></p>
+</div>
+</div>
+<p>Initial inspection shows a few higher yielding varieties jumping out, but the main distinction being one much lower yielding variety from out of the list of 13. But the trends are a little hard to spot, since the coding of genotypes from “A” to “M” is largely arbitrary - it is fairly rare in data analysis for alphabetical order to actually be the most intuitive or informative option for display.</p>
+<p>What might be nicer here is if we turn this into a “caterpillar” style box plot where the genotypes are ordered not by name (which is totally arbitrary) but by average yield. This is an example of something where to change the plot we actually have to change the data.</p>
+<p>A categorical axis is always presented in alphabetical order (if the underlying variable is a character) or in factor level order (if the underlying variable is a factor). By default factor level order will also be alphabetical - but this can be changed (unlike a character variable which will always be in alphabetical order).</p>
+<p>This is where piping into the plot becomes very nice - we may not want to change our underlying dataset but for the purpose of the plot we want to have a reordered version of gen. The reorder() function works fairly intuitively - first give the name of the categorical variable and then the name of the variable to set the order by. By default it will order by the mean values, but you can also change this to be by any summary value, e.g.&nbsp;if you wanted to order by maximum <code>max</code>, minimum <code>min</code>, median <code>median</code>, frequency <code>length</code> etc.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>oats_data <span class="sc">%&gt;%</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">gen=</span><span class="fu">reorder</span>(gen,yield)) <span class="sc">%&gt;%</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(<span class="fu">aes</span>(<span class="at">y=</span>gen,<span class="at">x=</span>yield))<span class="sc">+</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>    <span class="fu">geom_boxplot</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<p><img src="improved-code_files/figure-html/unnamed-chunk-5-1.png" class="img-fluid" width="672"></p>
+</div>
+</div>
+<p>Picking out the “High” and the “Low” yielding genotypes here is now quite a lot easier, as well as seeing how that group of higher yielding genotypes all do appear to have quite similar distributions.</p>
+<p>If you wanted the caterpillar the other way around - highest on bottom lowest on top there are a few options of how you could solve that issue with slightly sneaky data tricks e.g.add an extra call to factor and reverse the levels, change the call to reorder to order based on -1*yield instead of yield. But in this instance probably the simplest way to switch is through using a call to <code>scale_y_discrete(limits=rev)</code> - again a very useful trick that is often overlooked! This time it is modifying the plot itself, rather than the data to reverse the order of the axis.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>oats_data <span class="sc">%&gt;%</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">gen=</span><span class="fu">reorder</span>(gen,yield)) <span class="sc">%&gt;%</span></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(<span class="fu">aes</span>(<span class="at">y=</span>gen,<span class="at">x=</span>yield))<span class="sc">+</span></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>     <span class="fu">geom_boxplot</span>() <span class="sc">+</span></span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>      <span class="fu">scale_y_discrete</span>(<span class="at">limits=</span>rev)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<p><img src="improved-code_files/figure-html/unnamed-chunk-6-1.png" class="img-fluid" width="672"></p>
+</div>
+</div>
+<p>Remember when piping from the data into a plot that no changes are made to the underlying data - if I wanted to make a more permanent change to the order of my variables I would need to assign the updated data to a new object - in this case I will over-write my existing data set. It is always worth thinking carefully about doing this! But the advantage of having this reproducible script file is that if I do make a mistake I can just start again from the top of my code.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>oats_data<span class="ot">&lt;-</span><span class="fu">mutate</span>(oats_data,<span class="at">gen=</span><span class="fu">reorder</span>(gen,yield))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="tip-3---making-table-look-a-bit-nicer-in-our-reports" class="level2">
+<h2 class="anchored" data-anchor-id="tip-3---making-table-look-a-bit-nicer-in-our-reports">Tip 3 - Making Table Look a Bit Nicer In Our Reports</h2>
+<p>Of course I have multiple locations and multiple years in this data set, and this is something I should account for in my analysis. So I might want a three way table looking at the values by site and location. I can get lots of lovely summary statistics by using group_by and summarise:</p>
+<p>(Note that the order of genotypes is now based from overall lowest mean to overall highest based on the previous code.)</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>oats_data <span class="sc">%&gt;%</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(env,year,gen) <span class="sc">%&gt;%</span></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>   <span class="fu">summarise</span>(<span class="at">n=</span><span class="fu">n</span>(),<span class="at">mean=</span><span class="fu">mean</span>(yield),<span class="at">sd=</span><span class="fu">sd</span>(yield))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 78 × 6
+# Groups:   env, year [6]
+   env     year gen       n  mean    sd
+   &lt;chr&gt;  &lt;int&gt; &lt;fct&gt; &lt;int&gt; &lt;dbl&gt; &lt;dbl&gt;
+ 1 Karnal  1932 B         5  29.3  5.14
+ 2 Karnal  1932 H         5  36.5  6.59
+ 3 Karnal  1932 A         5  41.3  3.91
+ 4 Karnal  1932 K         5  39.4  8.84
+ 5 Karnal  1932 I         5  32.8  5.84
+ 6 Karnal  1932 F         5  34.4  5.54
+ 7 Karnal  1932 D         5  40.6  5.07
+ 8 Karnal  1932 E         5  35.7  6.17
+ 9 Karnal  1932 G         5  43.7  6.77
+10 Karnal  1932 J         5  44.3  6.05
+# ℹ 68 more rows</code></pre>
+</div>
+</div>
+<p>But this output is kind of overwhelming and definitely not the most efficient way of presenting this information with a 78 row table with far too many decimals and lots of repeated values and labels!</p>
+<p>There are built in functions to make ‘pretty’ summary tables - but usually I find I want a bit more control over exactly what is included and how it is laid out so it is really useful to know how to manipulate tables into the shape you want in R and present them nicely. It will save you a lot of time in the future - especially if you have ever found yourself copy-pasting numbers from R output into tables (please never ever do this, it will make me sad).</p>
+<p>So it is useful to know how to build something yourself - <code>pivot_</code> can be very powerful here for modifying the content and shape within R. I am going to ask it to reshape my data and have one column for each statistic in each year. This will give me a more manageable set of dimensions. I am going to assign it to an object called table0, since I will be re-using this initial summary table later on as the basis for a more presentable looking table.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>table0<span class="ot">&lt;-</span>oats_data <span class="sc">%&gt;%</span></span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(env,year,gen) <span class="sc">%&gt;%</span></span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>   <span class="fu">summarise</span>(<span class="at">mean=</span><span class="fu">mean</span>(yield),<span class="at">sd=</span><span class="fu">sd</span>(yield)) <span class="sc">%&gt;%</span></span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>        <span class="fu">pivot_wider</span>(<span class="at">names_from =</span> year,<span class="at">values_from =</span> <span class="fu">c</span>(mean,sd))</span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>table0</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 26 × 8
+# Groups:   env [2]
+   env    gen   mean_1932 mean_1933 mean_1934 sd_1932 sd_1933 sd_1934
+   &lt;chr&gt;  &lt;fct&gt;     &lt;dbl&gt;     &lt;dbl&gt;     &lt;dbl&gt;   &lt;dbl&gt;   &lt;dbl&gt;   &lt;dbl&gt;
+ 1 Karnal B          29.3      26.1      31.2    5.14    3.83    4.67
+ 2 Karnal H          36.5      36        36.8    6.59    7.80    4.92
+ 3 Karnal A          41.3      36.6      43.4    3.91    4.56    7.50
+ 4 Karnal K          39.4      38.5      40.3    8.84    3.91    8.25
+ 5 Karnal I          32.8      35.6      43.3    5.84    2.95    6.33
+ 6 Karnal F          34.4      37.5      41.9    5.54    3.35    8.20
+ 7 Karnal D          40.6      43.5      41      5.07    7.42    7.71
+ 8 Karnal E          35.7      43.6      42.7    6.17    5.86    8.14
+ 9 Karnal G          43.7      50.2      43.6    6.77    4.38    7.65
+10 Karnal J          44.3      53.7      42.1    6.05    5.83    5.72
+# ℹ 16 more rows</code></pre>
+</div>
+</div>
+<p>On it’s own this still is a bit overwhelming but it is now in a better position to tidy up!.</p>
+<p>Lots of functions now exist to improve appearance of tables; although it is an area of ongoing development so there are a lot of different options out there. I think the best to learn about would probably be the <code>gt()</code> package - it is designed as a “grammar of tables” similar to how ggplot is the “grammar of graphs” and developed by the RStudio team. Outputting a table into HTML/PDF/Word using gt will make it look a whole lot nicer, and the basic functionality is very simple to use.</p>
+<p>If you just want the table to “look like a table” when you output your results, rather than “looking like R output”, then the syntax is very very simple!</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>table0 <span class="sc">%&gt;%</span> </span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">gt</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+
+<div id="sgmxqznbkk" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
+<style>#sgmxqznbkk table {
+  font-family: system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#sgmxqznbkk thead, #sgmxqznbkk tbody, #sgmxqznbkk tfoot, #sgmxqznbkk tr, #sgmxqznbkk td, #sgmxqznbkk th {
+  border-style: none;
+}
+
+#sgmxqznbkk p {
+  margin: 0;
+  padding: 0;
+}
+
+#sgmxqznbkk .gt_table {
+  display: table;
+  border-collapse: collapse;
+  line-height: normal;
+  margin-left: auto;
+  margin-right: auto;
+  color: #333333;
+  font-size: 16px;
+  font-weight: normal;
+  font-style: normal;
+  background-color: #FFFFFF;
+  width: auto;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #A8A8A8;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #A8A8A8;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+}
+
+#sgmxqznbkk .gt_caption {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+#sgmxqznbkk .gt_title {
+  color: #333333;
+  font-size: 125%;
+  font-weight: initial;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-bottom-color: #FFFFFF;
+  border-bottom-width: 0;
+}
+
+#sgmxqznbkk .gt_subtitle {
+  color: #333333;
+  font-size: 85%;
+  font-weight: initial;
+  padding-top: 3px;
+  padding-bottom: 5px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-color: #FFFFFF;
+  border-top-width: 0;
+}
+
+#sgmxqznbkk .gt_heading {
+  background-color: #FFFFFF;
+  text-align: center;
+  border-bottom-color: #FFFFFF;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#sgmxqznbkk .gt_bottom_border {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#sgmxqznbkk .gt_col_headings {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#sgmxqznbkk .gt_col_heading {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 6px;
+  padding-left: 5px;
+  padding-right: 5px;
+  overflow-x: hidden;
+}
+
+#sgmxqznbkk .gt_column_spanner_outer {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+#sgmxqznbkk .gt_column_spanner_outer:first-child {
+  padding-left: 0;
+}
+
+#sgmxqznbkk .gt_column_spanner_outer:last-child {
+  padding-right: 0;
+}
+
+#sgmxqznbkk .gt_column_spanner {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  overflow-x: hidden;
+  display: inline-block;
+  width: 100%;
+}
+
+#sgmxqznbkk .gt_spanner_row {
+  border-bottom-style: hidden;
+}
+
+#sgmxqznbkk .gt_group_heading {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+  text-align: left;
+}
+
+#sgmxqznbkk .gt_empty_group_heading {
+  padding: 0.5px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: middle;
+}
+
+#sgmxqznbkk .gt_from_md > :first-child {
+  margin-top: 0;
+}
+
+#sgmxqznbkk .gt_from_md > :last-child {
+  margin-bottom: 0;
+}
+
+#sgmxqznbkk .gt_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  margin: 10px;
+  border-top-style: solid;
+  border-top-width: 1px;
+  border-top-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+  overflow-x: hidden;
+}
+
+#sgmxqznbkk .gt_stub {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-right-style: solid;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#sgmxqznbkk .gt_stub_row_group {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-right-style: solid;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  padding-left: 5px;
+  padding-right: 5px;
+  vertical-align: top;
+}
+
+#sgmxqznbkk .gt_row_group_first td {
+  border-top-width: 2px;
+}
+
+#sgmxqznbkk .gt_row_group_first th {
+  border-top-width: 2px;
+}
+
+#sgmxqznbkk .gt_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#sgmxqznbkk .gt_first_summary_row {
+  border-top-style: solid;
+  border-top-color: #D3D3D3;
+}
+
+#sgmxqznbkk .gt_first_summary_row.thick {
+  border-top-width: 2px;
+}
+
+#sgmxqznbkk .gt_last_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#sgmxqznbkk .gt_grand_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#sgmxqznbkk .gt_first_grand_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: double;
+  border-top-width: 6px;
+  border-top-color: #D3D3D3;
+}
+
+#sgmxqznbkk .gt_last_grand_summary_row_top {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-bottom-style: double;
+  border-bottom-width: 6px;
+  border-bottom-color: #D3D3D3;
+}
+
+#sgmxqznbkk .gt_striped {
+  background-color: rgba(128, 128, 128, 0.05);
+}
+
+#sgmxqznbkk .gt_table_body {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#sgmxqznbkk .gt_footnotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#sgmxqznbkk .gt_footnote {
+  margin: 0px;
+  font-size: 90%;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#sgmxqznbkk .gt_sourcenotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#sgmxqznbkk .gt_sourcenote {
+  font-size: 90%;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#sgmxqznbkk .gt_left {
+  text-align: left;
+}
+
+#sgmxqznbkk .gt_center {
+  text-align: center;
+}
+
+#sgmxqznbkk .gt_right {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+#sgmxqznbkk .gt_font_normal {
+  font-weight: normal;
+}
+
+#sgmxqznbkk .gt_font_bold {
+  font-weight: bold;
+}
+
+#sgmxqznbkk .gt_font_italic {
+  font-style: italic;
+}
+
+#sgmxqznbkk .gt_super {
+  font-size: 65%;
+}
+
+#sgmxqznbkk .gt_footnote_marks {
+  font-size: 75%;
+  vertical-align: 0.4em;
+  position: initial;
+}
+
+#sgmxqznbkk .gt_asterisk {
+  font-size: 100%;
+  vertical-align: 0;
+}
+
+#sgmxqznbkk .gt_indent_1 {
+  text-indent: 5px;
+}
+
+#sgmxqznbkk .gt_indent_2 {
+  text-indent: 10px;
+}
+
+#sgmxqznbkk .gt_indent_3 {
+  text-indent: 15px;
+}
+
+#sgmxqznbkk .gt_indent_4 {
+  text-indent: 20px;
+}
+
+#sgmxqznbkk .gt_indent_5 {
+  text-indent: 25px;
+}
+</style>
+<table class="gt_table" data-quarto-disable-processing="false" data-quarto-bootstrap="false">
+  <thead>
+    
+    <tr class="gt_col_headings">
+      <th class="gt_col_heading gt_columns_bottom_border gt_center" rowspan="1" colspan="1" scope="col" id="gen">gen</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1" scope="col" id="mean_1932">mean_1932</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1" scope="col" id="mean_1933">mean_1933</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1" scope="col" id="mean_1934">mean_1934</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1" scope="col" id="sd_1932">sd_1932</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1" scope="col" id="sd_1933">sd_1933</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1" scope="col" id="sd_1934">sd_1934</th>
+    </tr>
+  </thead>
+  <tbody class="gt_table_body">
+    <tr class="gt_group_heading_row">
+      <th colspan="7" class="gt_group_heading" scope="colgroup" id="Karnal">Karnal</th>
+    </tr>
+    <tr class="gt_row_group_first"><td headers="Karnal  gen" class="gt_row gt_center">B</td>
+<td headers="Karnal  mean_1932" class="gt_row gt_right">29.3</td>
+<td headers="Karnal  mean_1933" class="gt_row gt_right">26.1</td>
+<td headers="Karnal  mean_1934" class="gt_row gt_right">31.2</td>
+<td headers="Karnal  sd_1932" class="gt_row gt_right">5.142956</td>
+<td headers="Karnal  sd_1933" class="gt_row gt_right">3.830796</td>
+<td headers="Karnal  sd_1934" class="gt_row gt_right">4.671723</td></tr>
+    <tr><td headers="Karnal  gen" class="gt_row gt_center">H</td>
+<td headers="Karnal  mean_1932" class="gt_row gt_right">36.5</td>
+<td headers="Karnal  mean_1933" class="gt_row gt_right">36.0</td>
+<td headers="Karnal  mean_1934" class="gt_row gt_right">36.8</td>
+<td headers="Karnal  sd_1932" class="gt_row gt_right">6.585970</td>
+<td headers="Karnal  sd_1933" class="gt_row gt_right">7.802243</td>
+<td headers="Karnal  sd_1934" class="gt_row gt_right">4.919350</td></tr>
+    <tr><td headers="Karnal  gen" class="gt_row gt_center">A</td>
+<td headers="Karnal  mean_1932" class="gt_row gt_right">41.3</td>
+<td headers="Karnal  mean_1933" class="gt_row gt_right">36.6</td>
+<td headers="Karnal  mean_1934" class="gt_row gt_right">43.4</td>
+<td headers="Karnal  sd_1932" class="gt_row gt_right">3.914716</td>
+<td headers="Karnal  sd_1933" class="gt_row gt_right">4.560702</td>
+<td headers="Karnal  sd_1934" class="gt_row gt_right">7.503333</td></tr>
+    <tr><td headers="Karnal  gen" class="gt_row gt_center">K</td>
+<td headers="Karnal  mean_1932" class="gt_row gt_right">39.4</td>
+<td headers="Karnal  mean_1933" class="gt_row gt_right">38.5</td>
+<td headers="Karnal  mean_1934" class="gt_row gt_right">40.3</td>
+<td headers="Karnal  sd_1932" class="gt_row gt_right">8.841663</td>
+<td headers="Karnal  sd_1933" class="gt_row gt_right">3.905125</td>
+<td headers="Karnal  sd_1934" class="gt_row gt_right">8.250758</td></tr>
+    <tr><td headers="Karnal  gen" class="gt_row gt_center">I</td>
+<td headers="Karnal  mean_1932" class="gt_row gt_right">32.8</td>
+<td headers="Karnal  mean_1933" class="gt_row gt_right">35.6</td>
+<td headers="Karnal  mean_1934" class="gt_row gt_right">43.3</td>
+<td headers="Karnal  sd_1932" class="gt_row gt_right">5.837380</td>
+<td headers="Karnal  sd_1933" class="gt_row gt_right">2.945335</td>
+<td headers="Karnal  sd_1934" class="gt_row gt_right">6.330482</td></tr>
+    <tr><td headers="Karnal  gen" class="gt_row gt_center">F</td>
+<td headers="Karnal  mean_1932" class="gt_row gt_right">34.4</td>
+<td headers="Karnal  mean_1933" class="gt_row gt_right">37.5</td>
+<td headers="Karnal  mean_1934" class="gt_row gt_right">41.9</td>
+<td headers="Karnal  sd_1932" class="gt_row gt_right">5.538502</td>
+<td headers="Karnal  sd_1933" class="gt_row gt_right">3.354102</td>
+<td headers="Karnal  sd_1934" class="gt_row gt_right">8.196036</td></tr>
+    <tr><td headers="Karnal  gen" class="gt_row gt_center">D</td>
+<td headers="Karnal  mean_1932" class="gt_row gt_right">40.6</td>
+<td headers="Karnal  mean_1933" class="gt_row gt_right">43.5</td>
+<td headers="Karnal  mean_1934" class="gt_row gt_right">41.0</td>
+<td headers="Karnal  sd_1932" class="gt_row gt_right">5.067050</td>
+<td headers="Karnal  sd_1933" class="gt_row gt_right">7.424621</td>
+<td headers="Karnal  sd_1934" class="gt_row gt_right">7.705518</td></tr>
+    <tr><td headers="Karnal  gen" class="gt_row gt_center">E</td>
+<td headers="Karnal  mean_1932" class="gt_row gt_right">35.7</td>
+<td headers="Karnal  mean_1933" class="gt_row gt_right">43.6</td>
+<td headers="Karnal  mean_1934" class="gt_row gt_right">42.7</td>
+<td headers="Karnal  sd_1932" class="gt_row gt_right">6.170494</td>
+<td headers="Karnal  sd_1933" class="gt_row gt_right">5.856620</td>
+<td headers="Karnal  sd_1934" class="gt_row gt_right">8.144016</td></tr>
+    <tr><td headers="Karnal  gen" class="gt_row gt_center">G</td>
+<td headers="Karnal  mean_1932" class="gt_row gt_right">43.7</td>
+<td headers="Karnal  mean_1933" class="gt_row gt_right">50.2</td>
+<td headers="Karnal  mean_1934" class="gt_row gt_right">43.6</td>
+<td headers="Karnal  sd_1932" class="gt_row gt_right">6.769417</td>
+<td headers="Karnal  sd_1933" class="gt_row gt_right">4.381780</td>
+<td headers="Karnal  sd_1934" class="gt_row gt_right">7.651797</td></tr>
+    <tr><td headers="Karnal  gen" class="gt_row gt_center">J</td>
+<td headers="Karnal  mean_1932" class="gt_row gt_right">44.3</td>
+<td headers="Karnal  mean_1933" class="gt_row gt_right">53.7</td>
+<td headers="Karnal  mean_1934" class="gt_row gt_right">42.1</td>
+<td headers="Karnal  sd_1932" class="gt_row gt_right">6.047727</td>
+<td headers="Karnal  sd_1933" class="gt_row gt_right">5.826663</td>
+<td headers="Karnal  sd_1934" class="gt_row gt_right">5.716205</td></tr>
+    <tr><td headers="Karnal  gen" class="gt_row gt_center">C</td>
+<td headers="Karnal  mean_1932" class="gt_row gt_right">42.1</td>
+<td headers="Karnal  mean_1933" class="gt_row gt_right">47.7</td>
+<td headers="Karnal  mean_1934" class="gt_row gt_right">43.7</td>
+<td headers="Karnal  sd_1932" class="gt_row gt_right">3.748333</td>
+<td headers="Karnal  sd_1933" class="gt_row gt_right">7.310951</td>
+<td headers="Karnal  sd_1934" class="gt_row gt_right">7.910436</td></tr>
+    <tr><td headers="Karnal  gen" class="gt_row gt_center">L</td>
+<td headers="Karnal  mean_1932" class="gt_row gt_right">31.8</td>
+<td headers="Karnal  mean_1933" class="gt_row gt_right">55.9</td>
+<td headers="Karnal  mean_1934" class="gt_row gt_right">43.7</td>
+<td headers="Karnal  sd_1932" class="gt_row gt_right">8.415759</td>
+<td headers="Karnal  sd_1933" class="gt_row gt_right">8.763561</td>
+<td headers="Karnal  sd_1934" class="gt_row gt_right">6.833740</td></tr>
+    <tr><td headers="Karnal  gen" class="gt_row gt_center">M</td>
+<td headers="Karnal  mean_1932" class="gt_row gt_right">35.6</td>
+<td headers="Karnal  mean_1933" class="gt_row gt_right">57.5</td>
+<td headers="Karnal  mean_1934" class="gt_row gt_right">50.6</td>
+<td headers="Karnal  sd_1932" class="gt_row gt_right">6.702611</td>
+<td headers="Karnal  sd_1933" class="gt_row gt_right">3.807887</td>
+<td headers="Karnal  sd_1934" class="gt_row gt_right">6.580274</td></tr>
+    <tr class="gt_group_heading_row">
+      <th colspan="7" class="gt_group_heading" scope="colgroup" id="Pusa">Pusa</th>
+    </tr>
+    <tr class="gt_row_group_first"><td headers="Pusa  gen" class="gt_row gt_center">B</td>
+<td headers="Pusa  mean_1932" class="gt_row gt_right">24.7</td>
+<td headers="Pusa  mean_1933" class="gt_row gt_right">29.4</td>
+<td headers="Pusa  mean_1934" class="gt_row gt_right">34.9</td>
+<td headers="Pusa  sd_1932" class="gt_row gt_right">7.111610</td>
+<td headers="Pusa  sd_1933" class="gt_row gt_right">3.542598</td>
+<td headers="Pusa  sd_1934" class="gt_row gt_right">3.560197</td></tr>
+    <tr><td headers="Pusa  gen" class="gt_row gt_center">H</td>
+<td headers="Pusa  mean_1932" class="gt_row gt_right">22.2</td>
+<td headers="Pusa  mean_1933" class="gt_row gt_right">34.0</td>
+<td headers="Pusa  mean_1934" class="gt_row gt_right">48.5</td>
+<td headers="Pusa  sd_1932" class="gt_row gt_right">4.919350</td>
+<td headers="Pusa  sd_1933" class="gt_row gt_right">5.291503</td>
+<td headers="Pusa  sd_1934" class="gt_row gt_right">3.921097</td></tr>
+    <tr><td headers="Pusa  gen" class="gt_row gt_center">A</td>
+<td headers="Pusa  mean_1932" class="gt_row gt_right">25.5</td>
+<td headers="Pusa  mean_1933" class="gt_row gt_right">34.0</td>
+<td headers="Pusa  mean_1934" class="gt_row gt_right">47.3</td>
+<td headers="Pusa  sd_1932" class="gt_row gt_right">7.607562</td>
+<td headers="Pusa  sd_1933" class="gt_row gt_right">4.974937</td>
+<td headers="Pusa  sd_1934" class="gt_row gt_right">6.016644</td></tr>
+    <tr><td headers="Pusa  gen" class="gt_row gt_center">K</td>
+<td headers="Pusa  mean_1932" class="gt_row gt_right">27.2</td>
+<td headers="Pusa  mean_1933" class="gt_row gt_right">37.2</td>
+<td headers="Pusa  mean_1934" class="gt_row gt_right">45.8</td>
+<td headers="Pusa  sd_1932" class="gt_row gt_right">7.319495</td>
+<td headers="Pusa  sd_1933" class="gt_row gt_right">7.471613</td>
+<td headers="Pusa  sd_1934" class="gt_row gt_right">3.154362</td></tr>
+    <tr><td headers="Pusa  gen" class="gt_row gt_center">I</td>
+<td headers="Pusa  mean_1932" class="gt_row gt_right">23.3</td>
+<td headers="Pusa  mean_1933" class="gt_row gt_right">53.7</td>
+<td headers="Pusa  mean_1934" class="gt_row gt_right">50.8</td>
+<td headers="Pusa  sd_1932" class="gt_row gt_right">5.552027</td>
+<td headers="Pusa  sd_1933" class="gt_row gt_right">5.707451</td>
+<td headers="Pusa  sd_1934" class="gt_row gt_right">4.508326</td></tr>
+    <tr><td headers="Pusa  gen" class="gt_row gt_center">F</td>
+<td headers="Pusa  mean_1932" class="gt_row gt_right">34.8</td>
+<td headers="Pusa  mean_1933" class="gt_row gt_right">50.3</td>
+<td headers="Pusa  mean_1934" class="gt_row gt_right">45.4</td>
+<td headers="Pusa  sd_1932" class="gt_row gt_right">8.519096</td>
+<td headers="Pusa  sd_1933" class="gt_row gt_right">4.338779</td>
+<td headers="Pusa  sd_1934" class="gt_row gt_right">4.814042</td></tr>
+    <tr><td headers="Pusa  gen" class="gt_row gt_center">D</td>
+<td headers="Pusa  mean_1932" class="gt_row gt_right">26.3</td>
+<td headers="Pusa  mean_1933" class="gt_row gt_right">45.1</td>
+<td headers="Pusa  mean_1934" class="gt_row gt_right">49.9</td>
+<td headers="Pusa  sd_1932" class="gt_row gt_right">7.546522</td>
+<td headers="Pusa  sd_1933" class="gt_row gt_right">9.672125</td>
+<td headers="Pusa  sd_1934" class="gt_row gt_right">5.284411</td></tr>
+    <tr><td headers="Pusa  gen" class="gt_row gt_center">E</td>
+<td headers="Pusa  mean_1932" class="gt_row gt_right">30.9</td>
+<td headers="Pusa  mean_1933" class="gt_row gt_right">46.3</td>
+<td headers="Pusa  mean_1934" class="gt_row gt_right">54.1</td>
+<td headers="Pusa  sd_1932" class="gt_row gt_right">5.236888</td>
+<td headers="Pusa  sd_1933" class="gt_row gt_right">6.047727</td>
+<td headers="Pusa  sd_1934" class="gt_row gt_right">5.727128</td></tr>
+    <tr><td headers="Pusa  gen" class="gt_row gt_center">G</td>
+<td headers="Pusa  mean_1932" class="gt_row gt_right">30.2</td>
+<td headers="Pusa  mean_1933" class="gt_row gt_right">54.4</td>
+<td headers="Pusa  mean_1934" class="gt_row gt_right">56.1</td>
+<td headers="Pusa  sd_1932" class="gt_row gt_right">5.707451</td>
+<td headers="Pusa  sd_1933" class="gt_row gt_right">2.162175</td>
+<td headers="Pusa  sd_1934" class="gt_row gt_right">2.382226</td></tr>
+    <tr><td headers="Pusa  gen" class="gt_row gt_center">J</td>
+<td headers="Pusa  mean_1932" class="gt_row gt_right">31.8</td>
+<td headers="Pusa  mean_1933" class="gt_row gt_right">56.7</td>
+<td headers="Pusa  mean_1934" class="gt_row gt_right">56.1</td>
+<td headers="Pusa  sd_1932" class="gt_row gt_right">5.608030</td>
+<td headers="Pusa  sd_1933" class="gt_row gt_right">3.684427</td>
+<td headers="Pusa  sd_1934" class="gt_row gt_right">6.985700</td></tr>
+    <tr><td headers="Pusa  gen" class="gt_row gt_center">C</td>
+<td headers="Pusa  mean_1932" class="gt_row gt_right">24.4</td>
+<td headers="Pusa  mean_1933" class="gt_row gt_right">59.1</td>
+<td headers="Pusa  mean_1934" class="gt_row gt_right">67.9</td>
+<td headers="Pusa  sd_1932" class="gt_row gt_right">3.612478</td>
+<td headers="Pusa  sd_1933" class="gt_row gt_right">2.355844</td>
+<td headers="Pusa  sd_1934" class="gt_row gt_right">2.329163</td></tr>
+    <tr><td headers="Pusa  gen" class="gt_row gt_center">L</td>
+<td headers="Pusa  mean_1932" class="gt_row gt_right">44.3</td>
+<td headers="Pusa  mean_1933" class="gt_row gt_right">52.3</td>
+<td headers="Pusa  mean_1934" class="gt_row gt_right">59.5</td>
+<td headers="Pusa  sd_1932" class="gt_row gt_right">10.353743</td>
+<td headers="Pusa  sd_1933" class="gt_row gt_right">6.210878</td>
+<td headers="Pusa  sd_1934" class="gt_row gt_right">5.989574</td></tr>
+    <tr><td headers="Pusa  gen" class="gt_row gt_center">M</td>
+<td headers="Pusa  mean_1932" class="gt_row gt_right">32.2</td>
+<td headers="Pusa  mean_1933" class="gt_row gt_right">57.2</td>
+<td headers="Pusa  mean_1934" class="gt_row gt_right">63.8</td>
+<td headers="Pusa  sd_1932" class="gt_row gt_right">6.230971</td>
+<td headers="Pusa  sd_1933" class="gt_row gt_right">2.706474</td>
+<td headers="Pusa  sd_1934" class="gt_row gt_right">4.644890</td></tr>
+  </tbody>
+  
+  
+</table>
+</div>
+</div>
+</div>
+<p>Because <code>table0</code> was grouped by env using <code>group_by</code> in a previous step the output has carried these groups forward - you can see the separation of sections for the 2 locations. If the data wasn’t grouped before piping into gt, the groups could also have been added using the groupname_col= argument - <code>gt(groupname_col = "env")</code> instead</p>
+<p>It is also worth spending a bit of time to learn other <code>gt</code> functions to make your table ‘presentation’ ready using formats, spanners, groups, and labels and you can quickly start to create a much more ‘human-readable’ looking piece of output.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>table1<span class="ot">&lt;-</span>table0 <span class="sc">%&gt;%</span></span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>         <span class="fu">gt</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>           <span class="fu">fmt_number</span>(<span class="at">decimals=</span><span class="dv">1</span>)</span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>table1</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+
+<div id="mgpiypnlhe" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
+<style>#mgpiypnlhe table {
+  font-family: system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#mgpiypnlhe thead, #mgpiypnlhe tbody, #mgpiypnlhe tfoot, #mgpiypnlhe tr, #mgpiypnlhe td, #mgpiypnlhe th {
+  border-style: none;
+}
+
+#mgpiypnlhe p {
+  margin: 0;
+  padding: 0;
+}
+
+#mgpiypnlhe .gt_table {
+  display: table;
+  border-collapse: collapse;
+  line-height: normal;
+  margin-left: auto;
+  margin-right: auto;
+  color: #333333;
+  font-size: 16px;
+  font-weight: normal;
+  font-style: normal;
+  background-color: #FFFFFF;
+  width: auto;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #A8A8A8;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #A8A8A8;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+}
+
+#mgpiypnlhe .gt_caption {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+#mgpiypnlhe .gt_title {
+  color: #333333;
+  font-size: 125%;
+  font-weight: initial;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-bottom-color: #FFFFFF;
+  border-bottom-width: 0;
+}
+
+#mgpiypnlhe .gt_subtitle {
+  color: #333333;
+  font-size: 85%;
+  font-weight: initial;
+  padding-top: 3px;
+  padding-bottom: 5px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-color: #FFFFFF;
+  border-top-width: 0;
+}
+
+#mgpiypnlhe .gt_heading {
+  background-color: #FFFFFF;
+  text-align: center;
+  border-bottom-color: #FFFFFF;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#mgpiypnlhe .gt_bottom_border {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#mgpiypnlhe .gt_col_headings {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#mgpiypnlhe .gt_col_heading {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 6px;
+  padding-left: 5px;
+  padding-right: 5px;
+  overflow-x: hidden;
+}
+
+#mgpiypnlhe .gt_column_spanner_outer {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+#mgpiypnlhe .gt_column_spanner_outer:first-child {
+  padding-left: 0;
+}
+
+#mgpiypnlhe .gt_column_spanner_outer:last-child {
+  padding-right: 0;
+}
+
+#mgpiypnlhe .gt_column_spanner {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  overflow-x: hidden;
+  display: inline-block;
+  width: 100%;
+}
+
+#mgpiypnlhe .gt_spanner_row {
+  border-bottom-style: hidden;
+}
+
+#mgpiypnlhe .gt_group_heading {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+  text-align: left;
+}
+
+#mgpiypnlhe .gt_empty_group_heading {
+  padding: 0.5px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: middle;
+}
+
+#mgpiypnlhe .gt_from_md > :first-child {
+  margin-top: 0;
+}
+
+#mgpiypnlhe .gt_from_md > :last-child {
+  margin-bottom: 0;
+}
+
+#mgpiypnlhe .gt_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  margin: 10px;
+  border-top-style: solid;
+  border-top-width: 1px;
+  border-top-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+  overflow-x: hidden;
+}
+
+#mgpiypnlhe .gt_stub {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-right-style: solid;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#mgpiypnlhe .gt_stub_row_group {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-right-style: solid;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  padding-left: 5px;
+  padding-right: 5px;
+  vertical-align: top;
+}
+
+#mgpiypnlhe .gt_row_group_first td {
+  border-top-width: 2px;
+}
+
+#mgpiypnlhe .gt_row_group_first th {
+  border-top-width: 2px;
+}
+
+#mgpiypnlhe .gt_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#mgpiypnlhe .gt_first_summary_row {
+  border-top-style: solid;
+  border-top-color: #D3D3D3;
+}
+
+#mgpiypnlhe .gt_first_summary_row.thick {
+  border-top-width: 2px;
+}
+
+#mgpiypnlhe .gt_last_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#mgpiypnlhe .gt_grand_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#mgpiypnlhe .gt_first_grand_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: double;
+  border-top-width: 6px;
+  border-top-color: #D3D3D3;
+}
+
+#mgpiypnlhe .gt_last_grand_summary_row_top {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-bottom-style: double;
+  border-bottom-width: 6px;
+  border-bottom-color: #D3D3D3;
+}
+
+#mgpiypnlhe .gt_striped {
+  background-color: rgba(128, 128, 128, 0.05);
+}
+
+#mgpiypnlhe .gt_table_body {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#mgpiypnlhe .gt_footnotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#mgpiypnlhe .gt_footnote {
+  margin: 0px;
+  font-size: 90%;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#mgpiypnlhe .gt_sourcenotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#mgpiypnlhe .gt_sourcenote {
+  font-size: 90%;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#mgpiypnlhe .gt_left {
+  text-align: left;
+}
+
+#mgpiypnlhe .gt_center {
+  text-align: center;
+}
+
+#mgpiypnlhe .gt_right {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+#mgpiypnlhe .gt_font_normal {
+  font-weight: normal;
+}
+
+#mgpiypnlhe .gt_font_bold {
+  font-weight: bold;
+}
+
+#mgpiypnlhe .gt_font_italic {
+  font-style: italic;
+}
+
+#mgpiypnlhe .gt_super {
+  font-size: 65%;
+}
+
+#mgpiypnlhe .gt_footnote_marks {
+  font-size: 75%;
+  vertical-align: 0.4em;
+  position: initial;
+}
+
+#mgpiypnlhe .gt_asterisk {
+  font-size: 100%;
+  vertical-align: 0;
+}
+
+#mgpiypnlhe .gt_indent_1 {
+  text-indent: 5px;
+}
+
+#mgpiypnlhe .gt_indent_2 {
+  text-indent: 10px;
+}
+
+#mgpiypnlhe .gt_indent_3 {
+  text-indent: 15px;
+}
+
+#mgpiypnlhe .gt_indent_4 {
+  text-indent: 20px;
+}
+
+#mgpiypnlhe .gt_indent_5 {
+  text-indent: 25px;
+}
+</style>
+<table class="gt_table" data-quarto-disable-processing="false" data-quarto-bootstrap="false">
+  <thead>
+    
+    <tr class="gt_col_headings">
+      <th class="gt_col_heading gt_columns_bottom_border gt_center" rowspan="1" colspan="1" scope="col" id="gen">gen</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1" scope="col" id="mean_1932">mean_1932</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1" scope="col" id="mean_1933">mean_1933</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1" scope="col" id="mean_1934">mean_1934</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1" scope="col" id="sd_1932">sd_1932</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1" scope="col" id="sd_1933">sd_1933</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1" scope="col" id="sd_1934">sd_1934</th>
+    </tr>
+  </thead>
+  <tbody class="gt_table_body">
+    <tr class="gt_group_heading_row">
+      <th colspan="7" class="gt_group_heading" scope="colgroup" id="Karnal">Karnal</th>
+    </tr>
+    <tr class="gt_row_group_first"><td headers="Karnal  gen" class="gt_row gt_center">B</td>
+<td headers="Karnal  mean_1932" class="gt_row gt_right">29.3</td>
+<td headers="Karnal  mean_1933" class="gt_row gt_right">26.1</td>
+<td headers="Karnal  mean_1934" class="gt_row gt_right">31.2</td>
+<td headers="Karnal  sd_1932" class="gt_row gt_right">5.1</td>
+<td headers="Karnal  sd_1933" class="gt_row gt_right">3.8</td>
+<td headers="Karnal  sd_1934" class="gt_row gt_right">4.7</td></tr>
+    <tr><td headers="Karnal  gen" class="gt_row gt_center">H</td>
+<td headers="Karnal  mean_1932" class="gt_row gt_right">36.5</td>
+<td headers="Karnal  mean_1933" class="gt_row gt_right">36.0</td>
+<td headers="Karnal  mean_1934" class="gt_row gt_right">36.8</td>
+<td headers="Karnal  sd_1932" class="gt_row gt_right">6.6</td>
+<td headers="Karnal  sd_1933" class="gt_row gt_right">7.8</td>
+<td headers="Karnal  sd_1934" class="gt_row gt_right">4.9</td></tr>
+    <tr><td headers="Karnal  gen" class="gt_row gt_center">A</td>
+<td headers="Karnal  mean_1932" class="gt_row gt_right">41.3</td>
+<td headers="Karnal  mean_1933" class="gt_row gt_right">36.6</td>
+<td headers="Karnal  mean_1934" class="gt_row gt_right">43.4</td>
+<td headers="Karnal  sd_1932" class="gt_row gt_right">3.9</td>
+<td headers="Karnal  sd_1933" class="gt_row gt_right">4.6</td>
+<td headers="Karnal  sd_1934" class="gt_row gt_right">7.5</td></tr>
+    <tr><td headers="Karnal  gen" class="gt_row gt_center">K</td>
+<td headers="Karnal  mean_1932" class="gt_row gt_right">39.4</td>
+<td headers="Karnal  mean_1933" class="gt_row gt_right">38.5</td>
+<td headers="Karnal  mean_1934" class="gt_row gt_right">40.3</td>
+<td headers="Karnal  sd_1932" class="gt_row gt_right">8.8</td>
+<td headers="Karnal  sd_1933" class="gt_row gt_right">3.9</td>
+<td headers="Karnal  sd_1934" class="gt_row gt_right">8.3</td></tr>
+    <tr><td headers="Karnal  gen" class="gt_row gt_center">I</td>
+<td headers="Karnal  mean_1932" class="gt_row gt_right">32.8</td>
+<td headers="Karnal  mean_1933" class="gt_row gt_right">35.6</td>
+<td headers="Karnal  mean_1934" class="gt_row gt_right">43.3</td>
+<td headers="Karnal  sd_1932" class="gt_row gt_right">5.8</td>
+<td headers="Karnal  sd_1933" class="gt_row gt_right">2.9</td>
+<td headers="Karnal  sd_1934" class="gt_row gt_right">6.3</td></tr>
+    <tr><td headers="Karnal  gen" class="gt_row gt_center">F</td>
+<td headers="Karnal  mean_1932" class="gt_row gt_right">34.4</td>
+<td headers="Karnal  mean_1933" class="gt_row gt_right">37.5</td>
+<td headers="Karnal  mean_1934" class="gt_row gt_right">41.9</td>
+<td headers="Karnal  sd_1932" class="gt_row gt_right">5.5</td>
+<td headers="Karnal  sd_1933" class="gt_row gt_right">3.4</td>
+<td headers="Karnal  sd_1934" class="gt_row gt_right">8.2</td></tr>
+    <tr><td headers="Karnal  gen" class="gt_row gt_center">D</td>
+<td headers="Karnal  mean_1932" class="gt_row gt_right">40.6</td>
+<td headers="Karnal  mean_1933" class="gt_row gt_right">43.5</td>
+<td headers="Karnal  mean_1934" class="gt_row gt_right">41.0</td>
+<td headers="Karnal  sd_1932" class="gt_row gt_right">5.1</td>
+<td headers="Karnal  sd_1933" class="gt_row gt_right">7.4</td>
+<td headers="Karnal  sd_1934" class="gt_row gt_right">7.7</td></tr>
+    <tr><td headers="Karnal  gen" class="gt_row gt_center">E</td>
+<td headers="Karnal  mean_1932" class="gt_row gt_right">35.7</td>
+<td headers="Karnal  mean_1933" class="gt_row gt_right">43.6</td>
+<td headers="Karnal  mean_1934" class="gt_row gt_right">42.7</td>
+<td headers="Karnal  sd_1932" class="gt_row gt_right">6.2</td>
+<td headers="Karnal  sd_1933" class="gt_row gt_right">5.9</td>
+<td headers="Karnal  sd_1934" class="gt_row gt_right">8.1</td></tr>
+    <tr><td headers="Karnal  gen" class="gt_row gt_center">G</td>
+<td headers="Karnal  mean_1932" class="gt_row gt_right">43.7</td>
+<td headers="Karnal  mean_1933" class="gt_row gt_right">50.2</td>
+<td headers="Karnal  mean_1934" class="gt_row gt_right">43.6</td>
+<td headers="Karnal  sd_1932" class="gt_row gt_right">6.8</td>
+<td headers="Karnal  sd_1933" class="gt_row gt_right">4.4</td>
+<td headers="Karnal  sd_1934" class="gt_row gt_right">7.7</td></tr>
+    <tr><td headers="Karnal  gen" class="gt_row gt_center">J</td>
+<td headers="Karnal  mean_1932" class="gt_row gt_right">44.3</td>
+<td headers="Karnal  mean_1933" class="gt_row gt_right">53.7</td>
+<td headers="Karnal  mean_1934" class="gt_row gt_right">42.1</td>
+<td headers="Karnal  sd_1932" class="gt_row gt_right">6.0</td>
+<td headers="Karnal  sd_1933" class="gt_row gt_right">5.8</td>
+<td headers="Karnal  sd_1934" class="gt_row gt_right">5.7</td></tr>
+    <tr><td headers="Karnal  gen" class="gt_row gt_center">C</td>
+<td headers="Karnal  mean_1932" class="gt_row gt_right">42.1</td>
+<td headers="Karnal  mean_1933" class="gt_row gt_right">47.7</td>
+<td headers="Karnal  mean_1934" class="gt_row gt_right">43.7</td>
+<td headers="Karnal  sd_1932" class="gt_row gt_right">3.7</td>
+<td headers="Karnal  sd_1933" class="gt_row gt_right">7.3</td>
+<td headers="Karnal  sd_1934" class="gt_row gt_right">7.9</td></tr>
+    <tr><td headers="Karnal  gen" class="gt_row gt_center">L</td>
+<td headers="Karnal  mean_1932" class="gt_row gt_right">31.8</td>
+<td headers="Karnal  mean_1933" class="gt_row gt_right">55.9</td>
+<td headers="Karnal  mean_1934" class="gt_row gt_right">43.7</td>
+<td headers="Karnal  sd_1932" class="gt_row gt_right">8.4</td>
+<td headers="Karnal  sd_1933" class="gt_row gt_right">8.8</td>
+<td headers="Karnal  sd_1934" class="gt_row gt_right">6.8</td></tr>
+    <tr><td headers="Karnal  gen" class="gt_row gt_center">M</td>
+<td headers="Karnal  mean_1932" class="gt_row gt_right">35.6</td>
+<td headers="Karnal  mean_1933" class="gt_row gt_right">57.5</td>
+<td headers="Karnal  mean_1934" class="gt_row gt_right">50.6</td>
+<td headers="Karnal  sd_1932" class="gt_row gt_right">6.7</td>
+<td headers="Karnal  sd_1933" class="gt_row gt_right">3.8</td>
+<td headers="Karnal  sd_1934" class="gt_row gt_right">6.6</td></tr>
+    <tr class="gt_group_heading_row">
+      <th colspan="7" class="gt_group_heading" scope="colgroup" id="Pusa">Pusa</th>
+    </tr>
+    <tr class="gt_row_group_first"><td headers="Pusa  gen" class="gt_row gt_center">B</td>
+<td headers="Pusa  mean_1932" class="gt_row gt_right">24.7</td>
+<td headers="Pusa  mean_1933" class="gt_row gt_right">29.4</td>
+<td headers="Pusa  mean_1934" class="gt_row gt_right">34.9</td>
+<td headers="Pusa  sd_1932" class="gt_row gt_right">7.1</td>
+<td headers="Pusa  sd_1933" class="gt_row gt_right">3.5</td>
+<td headers="Pusa  sd_1934" class="gt_row gt_right">3.6</td></tr>
+    <tr><td headers="Pusa  gen" class="gt_row gt_center">H</td>
+<td headers="Pusa  mean_1932" class="gt_row gt_right">22.2</td>
+<td headers="Pusa  mean_1933" class="gt_row gt_right">34.0</td>
+<td headers="Pusa  mean_1934" class="gt_row gt_right">48.5</td>
+<td headers="Pusa  sd_1932" class="gt_row gt_right">4.9</td>
+<td headers="Pusa  sd_1933" class="gt_row gt_right">5.3</td>
+<td headers="Pusa  sd_1934" class="gt_row gt_right">3.9</td></tr>
+    <tr><td headers="Pusa  gen" class="gt_row gt_center">A</td>
+<td headers="Pusa  mean_1932" class="gt_row gt_right">25.5</td>
+<td headers="Pusa  mean_1933" class="gt_row gt_right">34.0</td>
+<td headers="Pusa  mean_1934" class="gt_row gt_right">47.3</td>
+<td headers="Pusa  sd_1932" class="gt_row gt_right">7.6</td>
+<td headers="Pusa  sd_1933" class="gt_row gt_right">5.0</td>
+<td headers="Pusa  sd_1934" class="gt_row gt_right">6.0</td></tr>
+    <tr><td headers="Pusa  gen" class="gt_row gt_center">K</td>
+<td headers="Pusa  mean_1932" class="gt_row gt_right">27.2</td>
+<td headers="Pusa  mean_1933" class="gt_row gt_right">37.2</td>
+<td headers="Pusa  mean_1934" class="gt_row gt_right">45.8</td>
+<td headers="Pusa  sd_1932" class="gt_row gt_right">7.3</td>
+<td headers="Pusa  sd_1933" class="gt_row gt_right">7.5</td>
+<td headers="Pusa  sd_1934" class="gt_row gt_right">3.2</td></tr>
+    <tr><td headers="Pusa  gen" class="gt_row gt_center">I</td>
+<td headers="Pusa  mean_1932" class="gt_row gt_right">23.3</td>
+<td headers="Pusa  mean_1933" class="gt_row gt_right">53.7</td>
+<td headers="Pusa  mean_1934" class="gt_row gt_right">50.8</td>
+<td headers="Pusa  sd_1932" class="gt_row gt_right">5.6</td>
+<td headers="Pusa  sd_1933" class="gt_row gt_right">5.7</td>
+<td headers="Pusa  sd_1934" class="gt_row gt_right">4.5</td></tr>
+    <tr><td headers="Pusa  gen" class="gt_row gt_center">F</td>
+<td headers="Pusa  mean_1932" class="gt_row gt_right">34.8</td>
+<td headers="Pusa  mean_1933" class="gt_row gt_right">50.3</td>
+<td headers="Pusa  mean_1934" class="gt_row gt_right">45.4</td>
+<td headers="Pusa  sd_1932" class="gt_row gt_right">8.5</td>
+<td headers="Pusa  sd_1933" class="gt_row gt_right">4.3</td>
+<td headers="Pusa  sd_1934" class="gt_row gt_right">4.8</td></tr>
+    <tr><td headers="Pusa  gen" class="gt_row gt_center">D</td>
+<td headers="Pusa  mean_1932" class="gt_row gt_right">26.3</td>
+<td headers="Pusa  mean_1933" class="gt_row gt_right">45.1</td>
+<td headers="Pusa  mean_1934" class="gt_row gt_right">49.9</td>
+<td headers="Pusa  sd_1932" class="gt_row gt_right">7.5</td>
+<td headers="Pusa  sd_1933" class="gt_row gt_right">9.7</td>
+<td headers="Pusa  sd_1934" class="gt_row gt_right">5.3</td></tr>
+    <tr><td headers="Pusa  gen" class="gt_row gt_center">E</td>
+<td headers="Pusa  mean_1932" class="gt_row gt_right">30.9</td>
+<td headers="Pusa  mean_1933" class="gt_row gt_right">46.3</td>
+<td headers="Pusa  mean_1934" class="gt_row gt_right">54.1</td>
+<td headers="Pusa  sd_1932" class="gt_row gt_right">5.2</td>
+<td headers="Pusa  sd_1933" class="gt_row gt_right">6.0</td>
+<td headers="Pusa  sd_1934" class="gt_row gt_right">5.7</td></tr>
+    <tr><td headers="Pusa  gen" class="gt_row gt_center">G</td>
+<td headers="Pusa  mean_1932" class="gt_row gt_right">30.2</td>
+<td headers="Pusa  mean_1933" class="gt_row gt_right">54.4</td>
+<td headers="Pusa  mean_1934" class="gt_row gt_right">56.1</td>
+<td headers="Pusa  sd_1932" class="gt_row gt_right">5.7</td>
+<td headers="Pusa  sd_1933" class="gt_row gt_right">2.2</td>
+<td headers="Pusa  sd_1934" class="gt_row gt_right">2.4</td></tr>
+    <tr><td headers="Pusa  gen" class="gt_row gt_center">J</td>
+<td headers="Pusa  mean_1932" class="gt_row gt_right">31.8</td>
+<td headers="Pusa  mean_1933" class="gt_row gt_right">56.7</td>
+<td headers="Pusa  mean_1934" class="gt_row gt_right">56.1</td>
+<td headers="Pusa  sd_1932" class="gt_row gt_right">5.6</td>
+<td headers="Pusa  sd_1933" class="gt_row gt_right">3.7</td>
+<td headers="Pusa  sd_1934" class="gt_row gt_right">7.0</td></tr>
+    <tr><td headers="Pusa  gen" class="gt_row gt_center">C</td>
+<td headers="Pusa  mean_1932" class="gt_row gt_right">24.4</td>
+<td headers="Pusa  mean_1933" class="gt_row gt_right">59.1</td>
+<td headers="Pusa  mean_1934" class="gt_row gt_right">67.9</td>
+<td headers="Pusa  sd_1932" class="gt_row gt_right">3.6</td>
+<td headers="Pusa  sd_1933" class="gt_row gt_right">2.4</td>
+<td headers="Pusa  sd_1934" class="gt_row gt_right">2.3</td></tr>
+    <tr><td headers="Pusa  gen" class="gt_row gt_center">L</td>
+<td headers="Pusa  mean_1932" class="gt_row gt_right">44.3</td>
+<td headers="Pusa  mean_1933" class="gt_row gt_right">52.3</td>
+<td headers="Pusa  mean_1934" class="gt_row gt_right">59.5</td>
+<td headers="Pusa  sd_1932" class="gt_row gt_right">10.4</td>
+<td headers="Pusa  sd_1933" class="gt_row gt_right">6.2</td>
+<td headers="Pusa  sd_1934" class="gt_row gt_right">6.0</td></tr>
+    <tr><td headers="Pusa  gen" class="gt_row gt_center">M</td>
+<td headers="Pusa  mean_1932" class="gt_row gt_right">32.2</td>
+<td headers="Pusa  mean_1933" class="gt_row gt_right">57.2</td>
+<td headers="Pusa  mean_1934" class="gt_row gt_right">63.8</td>
+<td headers="Pusa  sd_1932" class="gt_row gt_right">6.2</td>
+<td headers="Pusa  sd_1933" class="gt_row gt_right">2.7</td>
+<td headers="Pusa  sd_1934" class="gt_row gt_right">4.6</td></tr>
+  </tbody>
+  
+  
+</table>
+</div>
+</div>
+</div>
+<p>And bring lets now bring in ‘spanners’ for each year to organise the structure a little more. The terminology of ‘spanner’ may be unfamiliar, and perhaps a little unintuitive here, but from looking at the output it should immediately become clear what this means when you see the result:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb16"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>table2<span class="ot">&lt;-</span>table1 <span class="sc">%&gt;%</span></span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>    <span class="fu">tab_spanner</span>(<span class="at">label=</span><span class="st">"1932"</span>,<span class="at">columns=</span><span class="fu">contains</span>(<span class="st">"1932"</span>))<span class="sc">%&gt;%</span></span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>    <span class="fu">tab_spanner</span>(<span class="at">label=</span><span class="st">"1933"</span>,<span class="at">columns=</span><span class="fu">contains</span>(<span class="st">"1933"</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>    <span class="fu">tab_spanner</span>(<span class="at">label=</span><span class="st">"1934"</span>,<span class="at">columns=</span><span class="fu">contains</span>(<span class="st">"1934"</span>)) </span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a>table2</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+
+<div id="kkgbxsdpnj" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
+<style>#kkgbxsdpnj table {
+  font-family: system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#kkgbxsdpnj thead, #kkgbxsdpnj tbody, #kkgbxsdpnj tfoot, #kkgbxsdpnj tr, #kkgbxsdpnj td, #kkgbxsdpnj th {
+  border-style: none;
+}
+
+#kkgbxsdpnj p {
+  margin: 0;
+  padding: 0;
+}
+
+#kkgbxsdpnj .gt_table {
+  display: table;
+  border-collapse: collapse;
+  line-height: normal;
+  margin-left: auto;
+  margin-right: auto;
+  color: #333333;
+  font-size: 16px;
+  font-weight: normal;
+  font-style: normal;
+  background-color: #FFFFFF;
+  width: auto;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #A8A8A8;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #A8A8A8;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+}
+
+#kkgbxsdpnj .gt_caption {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+#kkgbxsdpnj .gt_title {
+  color: #333333;
+  font-size: 125%;
+  font-weight: initial;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-bottom-color: #FFFFFF;
+  border-bottom-width: 0;
+}
+
+#kkgbxsdpnj .gt_subtitle {
+  color: #333333;
+  font-size: 85%;
+  font-weight: initial;
+  padding-top: 3px;
+  padding-bottom: 5px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-color: #FFFFFF;
+  border-top-width: 0;
+}
+
+#kkgbxsdpnj .gt_heading {
+  background-color: #FFFFFF;
+  text-align: center;
+  border-bottom-color: #FFFFFF;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#kkgbxsdpnj .gt_bottom_border {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#kkgbxsdpnj .gt_col_headings {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#kkgbxsdpnj .gt_col_heading {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 6px;
+  padding-left: 5px;
+  padding-right: 5px;
+  overflow-x: hidden;
+}
+
+#kkgbxsdpnj .gt_column_spanner_outer {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+#kkgbxsdpnj .gt_column_spanner_outer:first-child {
+  padding-left: 0;
+}
+
+#kkgbxsdpnj .gt_column_spanner_outer:last-child {
+  padding-right: 0;
+}
+
+#kkgbxsdpnj .gt_column_spanner {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  overflow-x: hidden;
+  display: inline-block;
+  width: 100%;
+}
+
+#kkgbxsdpnj .gt_spanner_row {
+  border-bottom-style: hidden;
+}
+
+#kkgbxsdpnj .gt_group_heading {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+  text-align: left;
+}
+
+#kkgbxsdpnj .gt_empty_group_heading {
+  padding: 0.5px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: middle;
+}
+
+#kkgbxsdpnj .gt_from_md > :first-child {
+  margin-top: 0;
+}
+
+#kkgbxsdpnj .gt_from_md > :last-child {
+  margin-bottom: 0;
+}
+
+#kkgbxsdpnj .gt_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  margin: 10px;
+  border-top-style: solid;
+  border-top-width: 1px;
+  border-top-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+  overflow-x: hidden;
+}
+
+#kkgbxsdpnj .gt_stub {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-right-style: solid;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#kkgbxsdpnj .gt_stub_row_group {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-right-style: solid;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  padding-left: 5px;
+  padding-right: 5px;
+  vertical-align: top;
+}
+
+#kkgbxsdpnj .gt_row_group_first td {
+  border-top-width: 2px;
+}
+
+#kkgbxsdpnj .gt_row_group_first th {
+  border-top-width: 2px;
+}
+
+#kkgbxsdpnj .gt_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#kkgbxsdpnj .gt_first_summary_row {
+  border-top-style: solid;
+  border-top-color: #D3D3D3;
+}
+
+#kkgbxsdpnj .gt_first_summary_row.thick {
+  border-top-width: 2px;
+}
+
+#kkgbxsdpnj .gt_last_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#kkgbxsdpnj .gt_grand_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#kkgbxsdpnj .gt_first_grand_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: double;
+  border-top-width: 6px;
+  border-top-color: #D3D3D3;
+}
+
+#kkgbxsdpnj .gt_last_grand_summary_row_top {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-bottom-style: double;
+  border-bottom-width: 6px;
+  border-bottom-color: #D3D3D3;
+}
+
+#kkgbxsdpnj .gt_striped {
+  background-color: rgba(128, 128, 128, 0.05);
+}
+
+#kkgbxsdpnj .gt_table_body {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#kkgbxsdpnj .gt_footnotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#kkgbxsdpnj .gt_footnote {
+  margin: 0px;
+  font-size: 90%;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#kkgbxsdpnj .gt_sourcenotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#kkgbxsdpnj .gt_sourcenote {
+  font-size: 90%;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#kkgbxsdpnj .gt_left {
+  text-align: left;
+}
+
+#kkgbxsdpnj .gt_center {
+  text-align: center;
+}
+
+#kkgbxsdpnj .gt_right {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+#kkgbxsdpnj .gt_font_normal {
+  font-weight: normal;
+}
+
+#kkgbxsdpnj .gt_font_bold {
+  font-weight: bold;
+}
+
+#kkgbxsdpnj .gt_font_italic {
+  font-style: italic;
+}
+
+#kkgbxsdpnj .gt_super {
+  font-size: 65%;
+}
+
+#kkgbxsdpnj .gt_footnote_marks {
+  font-size: 75%;
+  vertical-align: 0.4em;
+  position: initial;
+}
+
+#kkgbxsdpnj .gt_asterisk {
+  font-size: 100%;
+  vertical-align: 0;
+}
+
+#kkgbxsdpnj .gt_indent_1 {
+  text-indent: 5px;
+}
+
+#kkgbxsdpnj .gt_indent_2 {
+  text-indent: 10px;
+}
+
+#kkgbxsdpnj .gt_indent_3 {
+  text-indent: 15px;
+}
+
+#kkgbxsdpnj .gt_indent_4 {
+  text-indent: 20px;
+}
+
+#kkgbxsdpnj .gt_indent_5 {
+  text-indent: 25px;
+}
+</style>
+<table class="gt_table" data-quarto-disable-processing="false" data-quarto-bootstrap="false">
+  <thead>
+    
+    <tr class="gt_col_headings gt_spanner_row">
+      <th class="gt_col_heading gt_columns_bottom_border gt_center" rowspan="2" colspan="1" scope="col" id="gen">gen</th>
+      <th class="gt_center gt_columns_top_border gt_column_spanner_outer" rowspan="1" colspan="2" scope="colgroup" id="1932">
+        <span class="gt_column_spanner">1932</span>
+      </th>
+      <th class="gt_center gt_columns_top_border gt_column_spanner_outer" rowspan="1" colspan="2" scope="colgroup" id="1933">
+        <span class="gt_column_spanner">1933</span>
+      </th>
+      <th class="gt_center gt_columns_top_border gt_column_spanner_outer" rowspan="1" colspan="2" scope="colgroup" id="1934">
+        <span class="gt_column_spanner">1934</span>
+      </th>
+    </tr>
+    <tr class="gt_col_headings">
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1" scope="col" id="mean_1932">mean_1932</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1" scope="col" id="sd_1932">sd_1932</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1" scope="col" id="mean_1933">mean_1933</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1" scope="col" id="sd_1933">sd_1933</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1" scope="col" id="mean_1934">mean_1934</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1" scope="col" id="sd_1934">sd_1934</th>
+    </tr>
+  </thead>
+  <tbody class="gt_table_body">
+    <tr class="gt_group_heading_row">
+      <th colspan="7" class="gt_group_heading" scope="colgroup" id="Karnal">Karnal</th>
+    </tr>
+    <tr class="gt_row_group_first"><td headers="Karnal  gen" class="gt_row gt_center">B</td>
+<td headers="Karnal  mean_1932" class="gt_row gt_right">29.3</td>
+<td headers="Karnal  sd_1932" class="gt_row gt_right">5.1</td>
+<td headers="Karnal  mean_1933" class="gt_row gt_right">26.1</td>
+<td headers="Karnal  sd_1933" class="gt_row gt_right">3.8</td>
+<td headers="Karnal  mean_1934" class="gt_row gt_right">31.2</td>
+<td headers="Karnal  sd_1934" class="gt_row gt_right">4.7</td></tr>
+    <tr><td headers="Karnal  gen" class="gt_row gt_center">H</td>
+<td headers="Karnal  mean_1932" class="gt_row gt_right">36.5</td>
+<td headers="Karnal  sd_1932" class="gt_row gt_right">6.6</td>
+<td headers="Karnal  mean_1933" class="gt_row gt_right">36.0</td>
+<td headers="Karnal  sd_1933" class="gt_row gt_right">7.8</td>
+<td headers="Karnal  mean_1934" class="gt_row gt_right">36.8</td>
+<td headers="Karnal  sd_1934" class="gt_row gt_right">4.9</td></tr>
+    <tr><td headers="Karnal  gen" class="gt_row gt_center">A</td>
+<td headers="Karnal  mean_1932" class="gt_row gt_right">41.3</td>
+<td headers="Karnal  sd_1932" class="gt_row gt_right">3.9</td>
+<td headers="Karnal  mean_1933" class="gt_row gt_right">36.6</td>
+<td headers="Karnal  sd_1933" class="gt_row gt_right">4.6</td>
+<td headers="Karnal  mean_1934" class="gt_row gt_right">43.4</td>
+<td headers="Karnal  sd_1934" class="gt_row gt_right">7.5</td></tr>
+    <tr><td headers="Karnal  gen" class="gt_row gt_center">K</td>
+<td headers="Karnal  mean_1932" class="gt_row gt_right">39.4</td>
+<td headers="Karnal  sd_1932" class="gt_row gt_right">8.8</td>
+<td headers="Karnal  mean_1933" class="gt_row gt_right">38.5</td>
+<td headers="Karnal  sd_1933" class="gt_row gt_right">3.9</td>
+<td headers="Karnal  mean_1934" class="gt_row gt_right">40.3</td>
+<td headers="Karnal  sd_1934" class="gt_row gt_right">8.3</td></tr>
+    <tr><td headers="Karnal  gen" class="gt_row gt_center">I</td>
+<td headers="Karnal  mean_1932" class="gt_row gt_right">32.8</td>
+<td headers="Karnal  sd_1932" class="gt_row gt_right">5.8</td>
+<td headers="Karnal  mean_1933" class="gt_row gt_right">35.6</td>
+<td headers="Karnal  sd_1933" class="gt_row gt_right">2.9</td>
+<td headers="Karnal  mean_1934" class="gt_row gt_right">43.3</td>
+<td headers="Karnal  sd_1934" class="gt_row gt_right">6.3</td></tr>
+    <tr><td headers="Karnal  gen" class="gt_row gt_center">F</td>
+<td headers="Karnal  mean_1932" class="gt_row gt_right">34.4</td>
+<td headers="Karnal  sd_1932" class="gt_row gt_right">5.5</td>
+<td headers="Karnal  mean_1933" class="gt_row gt_right">37.5</td>
+<td headers="Karnal  sd_1933" class="gt_row gt_right">3.4</td>
+<td headers="Karnal  mean_1934" class="gt_row gt_right">41.9</td>
+<td headers="Karnal  sd_1934" class="gt_row gt_right">8.2</td></tr>
+    <tr><td headers="Karnal  gen" class="gt_row gt_center">D</td>
+<td headers="Karnal  mean_1932" class="gt_row gt_right">40.6</td>
+<td headers="Karnal  sd_1932" class="gt_row gt_right">5.1</td>
+<td headers="Karnal  mean_1933" class="gt_row gt_right">43.5</td>
+<td headers="Karnal  sd_1933" class="gt_row gt_right">7.4</td>
+<td headers="Karnal  mean_1934" class="gt_row gt_right">41.0</td>
+<td headers="Karnal  sd_1934" class="gt_row gt_right">7.7</td></tr>
+    <tr><td headers="Karnal  gen" class="gt_row gt_center">E</td>
+<td headers="Karnal  mean_1932" class="gt_row gt_right">35.7</td>
+<td headers="Karnal  sd_1932" class="gt_row gt_right">6.2</td>
+<td headers="Karnal  mean_1933" class="gt_row gt_right">43.6</td>
+<td headers="Karnal  sd_1933" class="gt_row gt_right">5.9</td>
+<td headers="Karnal  mean_1934" class="gt_row gt_right">42.7</td>
+<td headers="Karnal  sd_1934" class="gt_row gt_right">8.1</td></tr>
+    <tr><td headers="Karnal  gen" class="gt_row gt_center">G</td>
+<td headers="Karnal  mean_1932" class="gt_row gt_right">43.7</td>
+<td headers="Karnal  sd_1932" class="gt_row gt_right">6.8</td>
+<td headers="Karnal  mean_1933" class="gt_row gt_right">50.2</td>
+<td headers="Karnal  sd_1933" class="gt_row gt_right">4.4</td>
+<td headers="Karnal  mean_1934" class="gt_row gt_right">43.6</td>
+<td headers="Karnal  sd_1934" class="gt_row gt_right">7.7</td></tr>
+    <tr><td headers="Karnal  gen" class="gt_row gt_center">J</td>
+<td headers="Karnal  mean_1932" class="gt_row gt_right">44.3</td>
+<td headers="Karnal  sd_1932" class="gt_row gt_right">6.0</td>
+<td headers="Karnal  mean_1933" class="gt_row gt_right">53.7</td>
+<td headers="Karnal  sd_1933" class="gt_row gt_right">5.8</td>
+<td headers="Karnal  mean_1934" class="gt_row gt_right">42.1</td>
+<td headers="Karnal  sd_1934" class="gt_row gt_right">5.7</td></tr>
+    <tr><td headers="Karnal  gen" class="gt_row gt_center">C</td>
+<td headers="Karnal  mean_1932" class="gt_row gt_right">42.1</td>
+<td headers="Karnal  sd_1932" class="gt_row gt_right">3.7</td>
+<td headers="Karnal  mean_1933" class="gt_row gt_right">47.7</td>
+<td headers="Karnal  sd_1933" class="gt_row gt_right">7.3</td>
+<td headers="Karnal  mean_1934" class="gt_row gt_right">43.7</td>
+<td headers="Karnal  sd_1934" class="gt_row gt_right">7.9</td></tr>
+    <tr><td headers="Karnal  gen" class="gt_row gt_center">L</td>
+<td headers="Karnal  mean_1932" class="gt_row gt_right">31.8</td>
+<td headers="Karnal  sd_1932" class="gt_row gt_right">8.4</td>
+<td headers="Karnal  mean_1933" class="gt_row gt_right">55.9</td>
+<td headers="Karnal  sd_1933" class="gt_row gt_right">8.8</td>
+<td headers="Karnal  mean_1934" class="gt_row gt_right">43.7</td>
+<td headers="Karnal  sd_1934" class="gt_row gt_right">6.8</td></tr>
+    <tr><td headers="Karnal  gen" class="gt_row gt_center">M</td>
+<td headers="Karnal  mean_1932" class="gt_row gt_right">35.6</td>
+<td headers="Karnal  sd_1932" class="gt_row gt_right">6.7</td>
+<td headers="Karnal  mean_1933" class="gt_row gt_right">57.5</td>
+<td headers="Karnal  sd_1933" class="gt_row gt_right">3.8</td>
+<td headers="Karnal  mean_1934" class="gt_row gt_right">50.6</td>
+<td headers="Karnal  sd_1934" class="gt_row gt_right">6.6</td></tr>
+    <tr class="gt_group_heading_row">
+      <th colspan="7" class="gt_group_heading" scope="colgroup" id="Pusa">Pusa</th>
+    </tr>
+    <tr class="gt_row_group_first"><td headers="Pusa  gen" class="gt_row gt_center">B</td>
+<td headers="Pusa  mean_1932" class="gt_row gt_right">24.7</td>
+<td headers="Pusa  sd_1932" class="gt_row gt_right">7.1</td>
+<td headers="Pusa  mean_1933" class="gt_row gt_right">29.4</td>
+<td headers="Pusa  sd_1933" class="gt_row gt_right">3.5</td>
+<td headers="Pusa  mean_1934" class="gt_row gt_right">34.9</td>
+<td headers="Pusa  sd_1934" class="gt_row gt_right">3.6</td></tr>
+    <tr><td headers="Pusa  gen" class="gt_row gt_center">H</td>
+<td headers="Pusa  mean_1932" class="gt_row gt_right">22.2</td>
+<td headers="Pusa  sd_1932" class="gt_row gt_right">4.9</td>
+<td headers="Pusa  mean_1933" class="gt_row gt_right">34.0</td>
+<td headers="Pusa  sd_1933" class="gt_row gt_right">5.3</td>
+<td headers="Pusa  mean_1934" class="gt_row gt_right">48.5</td>
+<td headers="Pusa  sd_1934" class="gt_row gt_right">3.9</td></tr>
+    <tr><td headers="Pusa  gen" class="gt_row gt_center">A</td>
+<td headers="Pusa  mean_1932" class="gt_row gt_right">25.5</td>
+<td headers="Pusa  sd_1932" class="gt_row gt_right">7.6</td>
+<td headers="Pusa  mean_1933" class="gt_row gt_right">34.0</td>
+<td headers="Pusa  sd_1933" class="gt_row gt_right">5.0</td>
+<td headers="Pusa  mean_1934" class="gt_row gt_right">47.3</td>
+<td headers="Pusa  sd_1934" class="gt_row gt_right">6.0</td></tr>
+    <tr><td headers="Pusa  gen" class="gt_row gt_center">K</td>
+<td headers="Pusa  mean_1932" class="gt_row gt_right">27.2</td>
+<td headers="Pusa  sd_1932" class="gt_row gt_right">7.3</td>
+<td headers="Pusa  mean_1933" class="gt_row gt_right">37.2</td>
+<td headers="Pusa  sd_1933" class="gt_row gt_right">7.5</td>
+<td headers="Pusa  mean_1934" class="gt_row gt_right">45.8</td>
+<td headers="Pusa  sd_1934" class="gt_row gt_right">3.2</td></tr>
+    <tr><td headers="Pusa  gen" class="gt_row gt_center">I</td>
+<td headers="Pusa  mean_1932" class="gt_row gt_right">23.3</td>
+<td headers="Pusa  sd_1932" class="gt_row gt_right">5.6</td>
+<td headers="Pusa  mean_1933" class="gt_row gt_right">53.7</td>
+<td headers="Pusa  sd_1933" class="gt_row gt_right">5.7</td>
+<td headers="Pusa  mean_1934" class="gt_row gt_right">50.8</td>
+<td headers="Pusa  sd_1934" class="gt_row gt_right">4.5</td></tr>
+    <tr><td headers="Pusa  gen" class="gt_row gt_center">F</td>
+<td headers="Pusa  mean_1932" class="gt_row gt_right">34.8</td>
+<td headers="Pusa  sd_1932" class="gt_row gt_right">8.5</td>
+<td headers="Pusa  mean_1933" class="gt_row gt_right">50.3</td>
+<td headers="Pusa  sd_1933" class="gt_row gt_right">4.3</td>
+<td headers="Pusa  mean_1934" class="gt_row gt_right">45.4</td>
+<td headers="Pusa  sd_1934" class="gt_row gt_right">4.8</td></tr>
+    <tr><td headers="Pusa  gen" class="gt_row gt_center">D</td>
+<td headers="Pusa  mean_1932" class="gt_row gt_right">26.3</td>
+<td headers="Pusa  sd_1932" class="gt_row gt_right">7.5</td>
+<td headers="Pusa  mean_1933" class="gt_row gt_right">45.1</td>
+<td headers="Pusa  sd_1933" class="gt_row gt_right">9.7</td>
+<td headers="Pusa  mean_1934" class="gt_row gt_right">49.9</td>
+<td headers="Pusa  sd_1934" class="gt_row gt_right">5.3</td></tr>
+    <tr><td headers="Pusa  gen" class="gt_row gt_center">E</td>
+<td headers="Pusa  mean_1932" class="gt_row gt_right">30.9</td>
+<td headers="Pusa  sd_1932" class="gt_row gt_right">5.2</td>
+<td headers="Pusa  mean_1933" class="gt_row gt_right">46.3</td>
+<td headers="Pusa  sd_1933" class="gt_row gt_right">6.0</td>
+<td headers="Pusa  mean_1934" class="gt_row gt_right">54.1</td>
+<td headers="Pusa  sd_1934" class="gt_row gt_right">5.7</td></tr>
+    <tr><td headers="Pusa  gen" class="gt_row gt_center">G</td>
+<td headers="Pusa  mean_1932" class="gt_row gt_right">30.2</td>
+<td headers="Pusa  sd_1932" class="gt_row gt_right">5.7</td>
+<td headers="Pusa  mean_1933" class="gt_row gt_right">54.4</td>
+<td headers="Pusa  sd_1933" class="gt_row gt_right">2.2</td>
+<td headers="Pusa  mean_1934" class="gt_row gt_right">56.1</td>
+<td headers="Pusa  sd_1934" class="gt_row gt_right">2.4</td></tr>
+    <tr><td headers="Pusa  gen" class="gt_row gt_center">J</td>
+<td headers="Pusa  mean_1932" class="gt_row gt_right">31.8</td>
+<td headers="Pusa  sd_1932" class="gt_row gt_right">5.6</td>
+<td headers="Pusa  mean_1933" class="gt_row gt_right">56.7</td>
+<td headers="Pusa  sd_1933" class="gt_row gt_right">3.7</td>
+<td headers="Pusa  mean_1934" class="gt_row gt_right">56.1</td>
+<td headers="Pusa  sd_1934" class="gt_row gt_right">7.0</td></tr>
+    <tr><td headers="Pusa  gen" class="gt_row gt_center">C</td>
+<td headers="Pusa  mean_1932" class="gt_row gt_right">24.4</td>
+<td headers="Pusa  sd_1932" class="gt_row gt_right">3.6</td>
+<td headers="Pusa  mean_1933" class="gt_row gt_right">59.1</td>
+<td headers="Pusa  sd_1933" class="gt_row gt_right">2.4</td>
+<td headers="Pusa  mean_1934" class="gt_row gt_right">67.9</td>
+<td headers="Pusa  sd_1934" class="gt_row gt_right">2.3</td></tr>
+    <tr><td headers="Pusa  gen" class="gt_row gt_center">L</td>
+<td headers="Pusa  mean_1932" class="gt_row gt_right">44.3</td>
+<td headers="Pusa  sd_1932" class="gt_row gt_right">10.4</td>
+<td headers="Pusa  mean_1933" class="gt_row gt_right">52.3</td>
+<td headers="Pusa  sd_1933" class="gt_row gt_right">6.2</td>
+<td headers="Pusa  mean_1934" class="gt_row gt_right">59.5</td>
+<td headers="Pusa  sd_1934" class="gt_row gt_right">6.0</td></tr>
+    <tr><td headers="Pusa  gen" class="gt_row gt_center">M</td>
+<td headers="Pusa  mean_1932" class="gt_row gt_right">32.2</td>
+<td headers="Pusa  sd_1932" class="gt_row gt_right">6.2</td>
+<td headers="Pusa  mean_1933" class="gt_row gt_right">57.2</td>
+<td headers="Pusa  sd_1933" class="gt_row gt_right">2.7</td>
+<td headers="Pusa  mean_1934" class="gt_row gt_right">63.8</td>
+<td headers="Pusa  sd_1934" class="gt_row gt_right">4.6</td></tr>
+  </tbody>
+  
+  
+</table>
+</div>
+</div>
+</div>
+<p>Then there are some nice functions for tidying things up with the labels, titles and styles. Since it is perfectly balanced trial with n=5 for all treatments in all environment/season combinations I will only put this in once for my final table in the subheader.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb17"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>table2 <span class="sc">%&gt;%</span></span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>    <span class="fu">cols_label</span>(<span class="fu">contains</span>(<span class="st">"mean"</span>)<span class="sc">~</span><span class="st">"Mean"</span>,</span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>               <span class="fu">contains</span>(<span class="st">"sd"</span>)<span class="sc">~</span><span class="st">"SD"</span>,</span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a>               <span class="st">"gen"</span><span class="ot">=</span><span class="st">"Genotype"</span>)<span class="sc">%&gt;%</span></span>
+<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a>           <span class="fu">tab_header</span>(<span class="st">"Oat Yield (kg/ha), Mean (SD)"</span>,<span class="at">subtitle =</span> <span class="st">"RCBD design; n=5 blocks per site per season"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a>       <span class="fu">opt_stylize</span>(<span class="at">style =</span> <span class="dv">3</span>, <span class="at">color =</span> <span class="st">'gray'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+
+<div id="qidryylsgy" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
+<style>#qidryylsgy table {
+  font-family: system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#qidryylsgy thead, #qidryylsgy tbody, #qidryylsgy tfoot, #qidryylsgy tr, #qidryylsgy td, #qidryylsgy th {
+  border-style: none;
+}
+
+#qidryylsgy p {
+  margin: 0;
+  padding: 0;
+}
+
+#qidryylsgy .gt_table {
+  display: table;
+  border-collapse: collapse;
+  line-height: normal;
+  margin-left: auto;
+  margin-right: auto;
+  color: #333333;
+  font-size: 16px;
+  font-weight: normal;
+  font-style: normal;
+  background-color: #FFFFFF;
+  width: auto;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #929292;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #929292;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+}
+
+#qidryylsgy .gt_caption {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+#qidryylsgy .gt_title {
+  color: #333333;
+  font-size: 125%;
+  font-weight: initial;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-bottom-color: #FFFFFF;
+  border-bottom-width: 0;
+}
+
+#qidryylsgy .gt_subtitle {
+  color: #333333;
+  font-size: 85%;
+  font-weight: initial;
+  padding-top: 3px;
+  padding-bottom: 5px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-color: #FFFFFF;
+  border-top-width: 0;
+}
+
+#qidryylsgy .gt_heading {
+  background-color: #FFFFFF;
+  text-align: center;
+  border-bottom-color: #FFFFFF;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#qidryylsgy .gt_bottom_border {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #929292;
+}
+
+#qidryylsgy .gt_col_headings {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #929292;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #929292;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#qidryylsgy .gt_col_heading {
+  color: #FFFFFF;
+  background-color: #000000;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 6px;
+  padding-left: 5px;
+  padding-right: 5px;
+  overflow-x: hidden;
+}
+
+#qidryylsgy .gt_column_spanner_outer {
+  color: #FFFFFF;
+  background-color: #000000;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+#qidryylsgy .gt_column_spanner_outer:first-child {
+  padding-left: 0;
+}
+
+#qidryylsgy .gt_column_spanner_outer:last-child {
+  padding-right: 0;
+}
+
+#qidryylsgy .gt_column_spanner {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #929292;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  overflow-x: hidden;
+  display: inline-block;
+  width: 100%;
+}
+
+#qidryylsgy .gt_spanner_row {
+  border-bottom-style: hidden;
+}
+
+#qidryylsgy .gt_group_heading {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #929292;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #929292;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+  text-align: left;
+}
+
+#qidryylsgy .gt_empty_group_heading {
+  padding: 0.5px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #929292;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #929292;
+  vertical-align: middle;
+}
+
+#qidryylsgy .gt_from_md > :first-child {
+  margin-top: 0;
+}
+
+#qidryylsgy .gt_from_md > :last-child {
+  margin-bottom: 0;
+}
+
+#qidryylsgy .gt_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  margin: 10px;
+  border-top-style: dashed;
+  border-top-width: 1px;
+  border-top-color: #929292;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #929292;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #929292;
+  vertical-align: middle;
+  overflow-x: hidden;
+}
+
+#qidryylsgy .gt_stub {
+  color: #333333;
+  background-color: #D5D5D5;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #FFFFFF;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#qidryylsgy .gt_stub_row_group {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-right-style: solid;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  padding-left: 5px;
+  padding-right: 5px;
+  vertical-align: top;
+}
+
+#qidryylsgy .gt_row_group_first td {
+  border-top-width: 2px;
+}
+
+#qidryylsgy .gt_row_group_first th {
+  border-top-width: 2px;
+}
+
+#qidryylsgy .gt_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#qidryylsgy .gt_first_summary_row {
+  border-top-style: solid;
+  border-top-color: #929292;
+}
+
+#qidryylsgy .gt_first_summary_row.thick {
+  border-top-width: 2px;
+}
+
+#qidryylsgy .gt_last_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #929292;
+}
+
+#qidryylsgy .gt_grand_summary_row {
+  color: #333333;
+  background-color: #D5D5D5;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#qidryylsgy .gt_first_grand_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: double;
+  border-top-width: 6px;
+  border-top-color: #929292;
+}
+
+#qidryylsgy .gt_last_grand_summary_row_top {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-bottom-style: double;
+  border-bottom-width: 6px;
+  border-bottom-color: #929292;
+}
+
+#qidryylsgy .gt_striped {
+  background-color: #F4F4F4;
+}
+
+#qidryylsgy .gt_table_body {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #929292;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #929292;
+}
+
+#qidryylsgy .gt_footnotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#qidryylsgy .gt_footnote {
+  margin: 0px;
+  font-size: 90%;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#qidryylsgy .gt_sourcenotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#qidryylsgy .gt_sourcenote {
+  font-size: 90%;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#qidryylsgy .gt_left {
+  text-align: left;
+}
+
+#qidryylsgy .gt_center {
+  text-align: center;
+}
+
+#qidryylsgy .gt_right {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+#qidryylsgy .gt_font_normal {
+  font-weight: normal;
+}
+
+#qidryylsgy .gt_font_bold {
+  font-weight: bold;
+}
+
+#qidryylsgy .gt_font_italic {
+  font-style: italic;
+}
+
+#qidryylsgy .gt_super {
+  font-size: 65%;
+}
+
+#qidryylsgy .gt_footnote_marks {
+  font-size: 75%;
+  vertical-align: 0.4em;
+  position: initial;
+}
+
+#qidryylsgy .gt_asterisk {
+  font-size: 100%;
+  vertical-align: 0;
+}
+
+#qidryylsgy .gt_indent_1 {
+  text-indent: 5px;
+}
+
+#qidryylsgy .gt_indent_2 {
+  text-indent: 10px;
+}
+
+#qidryylsgy .gt_indent_3 {
+  text-indent: 15px;
+}
+
+#qidryylsgy .gt_indent_4 {
+  text-indent: 20px;
+}
+
+#qidryylsgy .gt_indent_5 {
+  text-indent: 25px;
+}
+</style>
+<table class="gt_table" data-quarto-disable-processing="false" data-quarto-bootstrap="false">
+  <thead>
+    <tr class="gt_heading">
+      <td colspan="7" class="gt_heading gt_title gt_font_normal" style="">Oat Yield (kg/ha), Mean (SD)</td>
+    </tr>
+    <tr class="gt_heading">
+      <td colspan="7" class="gt_heading gt_subtitle gt_font_normal gt_bottom_border" style="">RCBD design; n=5 blocks per site per season</td>
+    </tr>
+    <tr class="gt_col_headings gt_spanner_row">
+      <th class="gt_col_heading gt_columns_bottom_border gt_center" rowspan="2" colspan="1" scope="col" id="Genotype">Genotype</th>
+      <th class="gt_center gt_columns_top_border gt_column_spanner_outer" rowspan="1" colspan="2" scope="colgroup" id="1932">
+        <span class="gt_column_spanner">1932</span>
+      </th>
+      <th class="gt_center gt_columns_top_border gt_column_spanner_outer" rowspan="1" colspan="2" scope="colgroup" id="1933">
+        <span class="gt_column_spanner">1933</span>
+      </th>
+      <th class="gt_center gt_columns_top_border gt_column_spanner_outer" rowspan="1" colspan="2" scope="colgroup" id="1934">
+        <span class="gt_column_spanner">1934</span>
+      </th>
+    </tr>
+    <tr class="gt_col_headings">
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1" scope="col" id="Mean">Mean</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1" scope="col" id="SD">SD</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1" scope="col" id="Mean">Mean</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1" scope="col" id="SD">SD</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1" scope="col" id="Mean">Mean</th>
+      <th class="gt_col_heading gt_columns_bottom_border gt_right" rowspan="1" colspan="1" scope="col" id="SD">SD</th>
+    </tr>
+  </thead>
+  <tbody class="gt_table_body">
+    <tr class="gt_group_heading_row">
+      <th colspan="7" class="gt_group_heading" scope="colgroup" id="Karnal">Karnal</th>
+    </tr>
+    <tr class="gt_row_group_first"><td headers="Karnal  gen" class="gt_row gt_center">B</td>
+<td headers="Karnal  mean_1932" class="gt_row gt_right">29.3</td>
+<td headers="Karnal  sd_1932" class="gt_row gt_right">5.1</td>
+<td headers="Karnal  mean_1933" class="gt_row gt_right">26.1</td>
+<td headers="Karnal  sd_1933" class="gt_row gt_right">3.8</td>
+<td headers="Karnal  mean_1934" class="gt_row gt_right">31.2</td>
+<td headers="Karnal  sd_1934" class="gt_row gt_right">4.7</td></tr>
+    <tr><td headers="Karnal  gen" class="gt_row gt_center gt_striped">H</td>
+<td headers="Karnal  mean_1932" class="gt_row gt_right gt_striped">36.5</td>
+<td headers="Karnal  sd_1932" class="gt_row gt_right gt_striped">6.6</td>
+<td headers="Karnal  mean_1933" class="gt_row gt_right gt_striped">36.0</td>
+<td headers="Karnal  sd_1933" class="gt_row gt_right gt_striped">7.8</td>
+<td headers="Karnal  mean_1934" class="gt_row gt_right gt_striped">36.8</td>
+<td headers="Karnal  sd_1934" class="gt_row gt_right gt_striped">4.9</td></tr>
+    <tr><td headers="Karnal  gen" class="gt_row gt_center">A</td>
+<td headers="Karnal  mean_1932" class="gt_row gt_right">41.3</td>
+<td headers="Karnal  sd_1932" class="gt_row gt_right">3.9</td>
+<td headers="Karnal  mean_1933" class="gt_row gt_right">36.6</td>
+<td headers="Karnal  sd_1933" class="gt_row gt_right">4.6</td>
+<td headers="Karnal  mean_1934" class="gt_row gt_right">43.4</td>
+<td headers="Karnal  sd_1934" class="gt_row gt_right">7.5</td></tr>
+    <tr><td headers="Karnal  gen" class="gt_row gt_center gt_striped">K</td>
+<td headers="Karnal  mean_1932" class="gt_row gt_right gt_striped">39.4</td>
+<td headers="Karnal  sd_1932" class="gt_row gt_right gt_striped">8.8</td>
+<td headers="Karnal  mean_1933" class="gt_row gt_right gt_striped">38.5</td>
+<td headers="Karnal  sd_1933" class="gt_row gt_right gt_striped">3.9</td>
+<td headers="Karnal  mean_1934" class="gt_row gt_right gt_striped">40.3</td>
+<td headers="Karnal  sd_1934" class="gt_row gt_right gt_striped">8.3</td></tr>
+    <tr><td headers="Karnal  gen" class="gt_row gt_center">I</td>
+<td headers="Karnal  mean_1932" class="gt_row gt_right">32.8</td>
+<td headers="Karnal  sd_1932" class="gt_row gt_right">5.8</td>
+<td headers="Karnal  mean_1933" class="gt_row gt_right">35.6</td>
+<td headers="Karnal  sd_1933" class="gt_row gt_right">2.9</td>
+<td headers="Karnal  mean_1934" class="gt_row gt_right">43.3</td>
+<td headers="Karnal  sd_1934" class="gt_row gt_right">6.3</td></tr>
+    <tr><td headers="Karnal  gen" class="gt_row gt_center gt_striped">F</td>
+<td headers="Karnal  mean_1932" class="gt_row gt_right gt_striped">34.4</td>
+<td headers="Karnal  sd_1932" class="gt_row gt_right gt_striped">5.5</td>
+<td headers="Karnal  mean_1933" class="gt_row gt_right gt_striped">37.5</td>
+<td headers="Karnal  sd_1933" class="gt_row gt_right gt_striped">3.4</td>
+<td headers="Karnal  mean_1934" class="gt_row gt_right gt_striped">41.9</td>
+<td headers="Karnal  sd_1934" class="gt_row gt_right gt_striped">8.2</td></tr>
+    <tr><td headers="Karnal  gen" class="gt_row gt_center">D</td>
+<td headers="Karnal  mean_1932" class="gt_row gt_right">40.6</td>
+<td headers="Karnal  sd_1932" class="gt_row gt_right">5.1</td>
+<td headers="Karnal  mean_1933" class="gt_row gt_right">43.5</td>
+<td headers="Karnal  sd_1933" class="gt_row gt_right">7.4</td>
+<td headers="Karnal  mean_1934" class="gt_row gt_right">41.0</td>
+<td headers="Karnal  sd_1934" class="gt_row gt_right">7.7</td></tr>
+    <tr><td headers="Karnal  gen" class="gt_row gt_center gt_striped">E</td>
+<td headers="Karnal  mean_1932" class="gt_row gt_right gt_striped">35.7</td>
+<td headers="Karnal  sd_1932" class="gt_row gt_right gt_striped">6.2</td>
+<td headers="Karnal  mean_1933" class="gt_row gt_right gt_striped">43.6</td>
+<td headers="Karnal  sd_1933" class="gt_row gt_right gt_striped">5.9</td>
+<td headers="Karnal  mean_1934" class="gt_row gt_right gt_striped">42.7</td>
+<td headers="Karnal  sd_1934" class="gt_row gt_right gt_striped">8.1</td></tr>
+    <tr><td headers="Karnal  gen" class="gt_row gt_center">G</td>
+<td headers="Karnal  mean_1932" class="gt_row gt_right">43.7</td>
+<td headers="Karnal  sd_1932" class="gt_row gt_right">6.8</td>
+<td headers="Karnal  mean_1933" class="gt_row gt_right">50.2</td>
+<td headers="Karnal  sd_1933" class="gt_row gt_right">4.4</td>
+<td headers="Karnal  mean_1934" class="gt_row gt_right">43.6</td>
+<td headers="Karnal  sd_1934" class="gt_row gt_right">7.7</td></tr>
+    <tr><td headers="Karnal  gen" class="gt_row gt_center gt_striped">J</td>
+<td headers="Karnal  mean_1932" class="gt_row gt_right gt_striped">44.3</td>
+<td headers="Karnal  sd_1932" class="gt_row gt_right gt_striped">6.0</td>
+<td headers="Karnal  mean_1933" class="gt_row gt_right gt_striped">53.7</td>
+<td headers="Karnal  sd_1933" class="gt_row gt_right gt_striped">5.8</td>
+<td headers="Karnal  mean_1934" class="gt_row gt_right gt_striped">42.1</td>
+<td headers="Karnal  sd_1934" class="gt_row gt_right gt_striped">5.7</td></tr>
+    <tr><td headers="Karnal  gen" class="gt_row gt_center">C</td>
+<td headers="Karnal  mean_1932" class="gt_row gt_right">42.1</td>
+<td headers="Karnal  sd_1932" class="gt_row gt_right">3.7</td>
+<td headers="Karnal  mean_1933" class="gt_row gt_right">47.7</td>
+<td headers="Karnal  sd_1933" class="gt_row gt_right">7.3</td>
+<td headers="Karnal  mean_1934" class="gt_row gt_right">43.7</td>
+<td headers="Karnal  sd_1934" class="gt_row gt_right">7.9</td></tr>
+    <tr><td headers="Karnal  gen" class="gt_row gt_center gt_striped">L</td>
+<td headers="Karnal  mean_1932" class="gt_row gt_right gt_striped">31.8</td>
+<td headers="Karnal  sd_1932" class="gt_row gt_right gt_striped">8.4</td>
+<td headers="Karnal  mean_1933" class="gt_row gt_right gt_striped">55.9</td>
+<td headers="Karnal  sd_1933" class="gt_row gt_right gt_striped">8.8</td>
+<td headers="Karnal  mean_1934" class="gt_row gt_right gt_striped">43.7</td>
+<td headers="Karnal  sd_1934" class="gt_row gt_right gt_striped">6.8</td></tr>
+    <tr><td headers="Karnal  gen" class="gt_row gt_center">M</td>
+<td headers="Karnal  mean_1932" class="gt_row gt_right">35.6</td>
+<td headers="Karnal  sd_1932" class="gt_row gt_right">6.7</td>
+<td headers="Karnal  mean_1933" class="gt_row gt_right">57.5</td>
+<td headers="Karnal  sd_1933" class="gt_row gt_right">3.8</td>
+<td headers="Karnal  mean_1934" class="gt_row gt_right">50.6</td>
+<td headers="Karnal  sd_1934" class="gt_row gt_right">6.6</td></tr>
+    <tr class="gt_group_heading_row">
+      <th colspan="7" class="gt_group_heading" scope="colgroup" id="Pusa">Pusa</th>
+    </tr>
+    <tr class="gt_row_group_first"><td headers="Pusa  gen" class="gt_row gt_center gt_striped">B</td>
+<td headers="Pusa  mean_1932" class="gt_row gt_right gt_striped">24.7</td>
+<td headers="Pusa  sd_1932" class="gt_row gt_right gt_striped">7.1</td>
+<td headers="Pusa  mean_1933" class="gt_row gt_right gt_striped">29.4</td>
+<td headers="Pusa  sd_1933" class="gt_row gt_right gt_striped">3.5</td>
+<td headers="Pusa  mean_1934" class="gt_row gt_right gt_striped">34.9</td>
+<td headers="Pusa  sd_1934" class="gt_row gt_right gt_striped">3.6</td></tr>
+    <tr><td headers="Pusa  gen" class="gt_row gt_center">H</td>
+<td headers="Pusa  mean_1932" class="gt_row gt_right">22.2</td>
+<td headers="Pusa  sd_1932" class="gt_row gt_right">4.9</td>
+<td headers="Pusa  mean_1933" class="gt_row gt_right">34.0</td>
+<td headers="Pusa  sd_1933" class="gt_row gt_right">5.3</td>
+<td headers="Pusa  mean_1934" class="gt_row gt_right">48.5</td>
+<td headers="Pusa  sd_1934" class="gt_row gt_right">3.9</td></tr>
+    <tr><td headers="Pusa  gen" class="gt_row gt_center gt_striped">A</td>
+<td headers="Pusa  mean_1932" class="gt_row gt_right gt_striped">25.5</td>
+<td headers="Pusa  sd_1932" class="gt_row gt_right gt_striped">7.6</td>
+<td headers="Pusa  mean_1933" class="gt_row gt_right gt_striped">34.0</td>
+<td headers="Pusa  sd_1933" class="gt_row gt_right gt_striped">5.0</td>
+<td headers="Pusa  mean_1934" class="gt_row gt_right gt_striped">47.3</td>
+<td headers="Pusa  sd_1934" class="gt_row gt_right gt_striped">6.0</td></tr>
+    <tr><td headers="Pusa  gen" class="gt_row gt_center">K</td>
+<td headers="Pusa  mean_1932" class="gt_row gt_right">27.2</td>
+<td headers="Pusa  sd_1932" class="gt_row gt_right">7.3</td>
+<td headers="Pusa  mean_1933" class="gt_row gt_right">37.2</td>
+<td headers="Pusa  sd_1933" class="gt_row gt_right">7.5</td>
+<td headers="Pusa  mean_1934" class="gt_row gt_right">45.8</td>
+<td headers="Pusa  sd_1934" class="gt_row gt_right">3.2</td></tr>
+    <tr><td headers="Pusa  gen" class="gt_row gt_center gt_striped">I</td>
+<td headers="Pusa  mean_1932" class="gt_row gt_right gt_striped">23.3</td>
+<td headers="Pusa  sd_1932" class="gt_row gt_right gt_striped">5.6</td>
+<td headers="Pusa  mean_1933" class="gt_row gt_right gt_striped">53.7</td>
+<td headers="Pusa  sd_1933" class="gt_row gt_right gt_striped">5.7</td>
+<td headers="Pusa  mean_1934" class="gt_row gt_right gt_striped">50.8</td>
+<td headers="Pusa  sd_1934" class="gt_row gt_right gt_striped">4.5</td></tr>
+    <tr><td headers="Pusa  gen" class="gt_row gt_center">F</td>
+<td headers="Pusa  mean_1932" class="gt_row gt_right">34.8</td>
+<td headers="Pusa  sd_1932" class="gt_row gt_right">8.5</td>
+<td headers="Pusa  mean_1933" class="gt_row gt_right">50.3</td>
+<td headers="Pusa  sd_1933" class="gt_row gt_right">4.3</td>
+<td headers="Pusa  mean_1934" class="gt_row gt_right">45.4</td>
+<td headers="Pusa  sd_1934" class="gt_row gt_right">4.8</td></tr>
+    <tr><td headers="Pusa  gen" class="gt_row gt_center gt_striped">D</td>
+<td headers="Pusa  mean_1932" class="gt_row gt_right gt_striped">26.3</td>
+<td headers="Pusa  sd_1932" class="gt_row gt_right gt_striped">7.5</td>
+<td headers="Pusa  mean_1933" class="gt_row gt_right gt_striped">45.1</td>
+<td headers="Pusa  sd_1933" class="gt_row gt_right gt_striped">9.7</td>
+<td headers="Pusa  mean_1934" class="gt_row gt_right gt_striped">49.9</td>
+<td headers="Pusa  sd_1934" class="gt_row gt_right gt_striped">5.3</td></tr>
+    <tr><td headers="Pusa  gen" class="gt_row gt_center">E</td>
+<td headers="Pusa  mean_1932" class="gt_row gt_right">30.9</td>
+<td headers="Pusa  sd_1932" class="gt_row gt_right">5.2</td>
+<td headers="Pusa  mean_1933" class="gt_row gt_right">46.3</td>
+<td headers="Pusa  sd_1933" class="gt_row gt_right">6.0</td>
+<td headers="Pusa  mean_1934" class="gt_row gt_right">54.1</td>
+<td headers="Pusa  sd_1934" class="gt_row gt_right">5.7</td></tr>
+    <tr><td headers="Pusa  gen" class="gt_row gt_center gt_striped">G</td>
+<td headers="Pusa  mean_1932" class="gt_row gt_right gt_striped">30.2</td>
+<td headers="Pusa  sd_1932" class="gt_row gt_right gt_striped">5.7</td>
+<td headers="Pusa  mean_1933" class="gt_row gt_right gt_striped">54.4</td>
+<td headers="Pusa  sd_1933" class="gt_row gt_right gt_striped">2.2</td>
+<td headers="Pusa  mean_1934" class="gt_row gt_right gt_striped">56.1</td>
+<td headers="Pusa  sd_1934" class="gt_row gt_right gt_striped">2.4</td></tr>
+    <tr><td headers="Pusa  gen" class="gt_row gt_center">J</td>
+<td headers="Pusa  mean_1932" class="gt_row gt_right">31.8</td>
+<td headers="Pusa  sd_1932" class="gt_row gt_right">5.6</td>
+<td headers="Pusa  mean_1933" class="gt_row gt_right">56.7</td>
+<td headers="Pusa  sd_1933" class="gt_row gt_right">3.7</td>
+<td headers="Pusa  mean_1934" class="gt_row gt_right">56.1</td>
+<td headers="Pusa  sd_1934" class="gt_row gt_right">7.0</td></tr>
+    <tr><td headers="Pusa  gen" class="gt_row gt_center gt_striped">C</td>
+<td headers="Pusa  mean_1932" class="gt_row gt_right gt_striped">24.4</td>
+<td headers="Pusa  sd_1932" class="gt_row gt_right gt_striped">3.6</td>
+<td headers="Pusa  mean_1933" class="gt_row gt_right gt_striped">59.1</td>
+<td headers="Pusa  sd_1933" class="gt_row gt_right gt_striped">2.4</td>
+<td headers="Pusa  mean_1934" class="gt_row gt_right gt_striped">67.9</td>
+<td headers="Pusa  sd_1934" class="gt_row gt_right gt_striped">2.3</td></tr>
+    <tr><td headers="Pusa  gen" class="gt_row gt_center">L</td>
+<td headers="Pusa  mean_1932" class="gt_row gt_right">44.3</td>
+<td headers="Pusa  sd_1932" class="gt_row gt_right">10.4</td>
+<td headers="Pusa  mean_1933" class="gt_row gt_right">52.3</td>
+<td headers="Pusa  sd_1933" class="gt_row gt_right">6.2</td>
+<td headers="Pusa  mean_1934" class="gt_row gt_right">59.5</td>
+<td headers="Pusa  sd_1934" class="gt_row gt_right">6.0</td></tr>
+    <tr><td headers="Pusa  gen" class="gt_row gt_center gt_striped">M</td>
+<td headers="Pusa  mean_1932" class="gt_row gt_right gt_striped">32.2</td>
+<td headers="Pusa  sd_1932" class="gt_row gt_right gt_striped">6.2</td>
+<td headers="Pusa  mean_1933" class="gt_row gt_right gt_striped">57.2</td>
+<td headers="Pusa  sd_1933" class="gt_row gt_right gt_striped">2.7</td>
+<td headers="Pusa  mean_1934" class="gt_row gt_right gt_striped">63.8</td>
+<td headers="Pusa  sd_1934" class="gt_row gt_right gt_striped">4.6</td></tr>
+  </tbody>
+  
+  
+</table>
+</div>
+</div>
+</div>
+<p>See: https://gt.albert-rapp.de/getting_started for more.</p>
+</section>
+<section id="tip-4---make-sure-you-know-your-data-and-know-what-to-expect-in-your-output" class="level2">
+<h2 class="anchored" data-anchor-id="tip-4---make-sure-you-know-your-data-and-know-what-to-expect-in-your-output">Tip 4 - Make sure you know your data, and know what to expect in your output</h2>
+<p>I am going to fit a standard ANOVA model with a 3 way interaction between genotype and year and environment. As a quick aside, for those not aware, R makes no real distinction in what functions you use between an “ANOVA” or an “ANCOVA” or a “Multiple Linear Regression” - all of these are just different names for applying a standard linear model - lm(). And using the lm/glm/lmer family of functions in R gives us a whole lot more flexibility without getting bogged down in how to ‘name’ a particular model we can describe exactly how we want it to work - extending it very easily to all sorts of non-Gaussian link functions or different forms of hierarchical or longitudinal models.</p>
+<p>In practice my advice is that I have never yet really found an instance where <code>aov()</code> would ever be my choice over <code>lm()</code> or <code>lmer()</code> - although I am sure many people may have been taught to use it when learning about statistics in R.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>model1<span class="ot">&lt;-</span><span class="fu">lm</span>(yield<span class="sc">~</span>gen<span class="sc">*</span>year<span class="sc">*</span>env,<span class="at">data=</span>oats_data)</span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(model1)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Call:
+lm(formula = yield ~ gen * year * env, data = oats_data)
+
+Residuals:
+     Min       1Q   Median       3Q      Max 
+-18.8500  -4.7417  -0.4333   4.3167  21.2000 
+
+Coefficients:
+                    Estimate Std. Error t value Pr(&gt;|t|)    
+(Intercept)        -1807.483   4375.465  -0.413 0.679799    
+genH                1553.967   6187.842   0.251 0.801864    
+genA                -181.733   6187.842  -0.029 0.976587    
+genK                 977.033   6187.842   0.158 0.874633    
+genI               -8303.533   6187.842  -1.342 0.180526    
+genF               -5403.333   6187.842  -0.873 0.383164    
+genD                1462.583   6187.842   0.236 0.813293    
+genE               -4917.350   6187.842  -0.795 0.427358    
+genG                1949.967   6187.842   0.315 0.752858    
+genJ                3980.483   6187.842   0.643 0.520482    
+genC                 305.583   6187.842   0.049 0.960642    
+genL               -9650.067   6187.842  -1.560 0.119809    
+genM              -12642.117   6187.842  -2.043 0.041822 *  
+year                   0.950      2.264   0.420 0.674977    
+envPusa            -8021.150   6187.842  -1.296 0.195765    
+genH:year             -0.800      3.201  -0.250 0.802809    
+genA:year              0.100      3.201   0.031 0.975098    
+genK:year             -0.500      3.201  -0.156 0.875974    
+genI:year              4.300      3.201   1.343 0.180088    
+genF:year              2.800      3.201   0.875 0.382367    
+genD:year             -0.750      3.201  -0.234 0.814902    
+genE:year              2.550      3.201   0.797 0.426250    
+genG:year             -1.000      3.201  -0.312 0.754939    
+genJ:year             -2.050      3.201  -0.640 0.522351    
+genC:year             -0.150      3.201  -0.047 0.962654    
+genL:year              5.000      3.201   1.562 0.119239    
+genM:year              6.550      3.201   2.046 0.041517 *  
+genH:envPusa      -17109.383   8750.929  -1.955 0.051389 .  
+genA:envPusa      -11023.733   8750.929  -1.260 0.208639    
+genK:envPusa       -9088.567   8750.929  -1.039 0.299741    
+genI:envPusa       -8403.983   8750.929  -0.960 0.337564    
+genF:envPusa        5030.567   8750.929   0.575 0.565768    
+genD:envPusa      -14402.917   8750.929  -1.646 0.100719    
+genE:envPusa       -7633.050   8750.929  -0.872 0.383688    
+genG:envPusa      -17106.783   8750.929  -1.955 0.051424 .  
+genJ:envPusa      -17589.600   8750.929  -2.010 0.045223 *  
+genC:envPusa      -32469.233   8750.929  -3.710 0.000242 ***
+genL:envPusa        4839.933   8750.929   0.553 0.580577    
+genM:envPusa       -8019.583   8750.929  -0.916 0.360097    
+year:envPusa           4.150      3.201   1.296 0.195720    
+genH:year:envPusa      8.850      4.527   1.955 0.051421 .  
+genA:year:envPusa      5.700      4.527   1.259 0.208871    
+genK:year:envPusa      4.700      4.527   1.038 0.299925    
+genI:year:envPusa      4.350      4.527   0.961 0.337302    
+genF:year:envPusa     -2.600      4.527  -0.574 0.566136    
+genD:year:envPusa      7.450      4.527   1.646 0.100768    
+genE:year:envPusa      3.950      4.527   0.873 0.383545    
+genG:year:envPusa      8.850      4.527   1.955 0.051421 .  
+genJ:year:envPusa      9.100      4.527   2.010 0.045214 *  
+genC:year:envPusa     16.800      4.527   3.711 0.000241 ***
+genL:year:envPusa     -2.500      4.527  -0.552 0.581158    
+genM:year:envPusa      4.150      4.527   0.917 0.359955    
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+Residual standard error: 7.158 on 338 degrees of freedom
+Multiple R-squared:  0.6713,    Adjusted R-squared:  0.6217 
+F-statistic: 13.53 on 51 and 338 DF,  p-value: &lt; 2.2e-16</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb20"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="fu">anova</span>(model1)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Analysis of Variance Table
+
+Response: yield
+              Df  Sum Sq Mean Sq  F value    Pr(&gt;F)    
+gen           12 12297.2  1024.8  20.0004 &lt; 2.2e-16 ***
+year           1 12399.3 12399.3 241.9986 &lt; 2.2e-16 ***
+env            1   345.4   345.4   6.7404  0.009837 ** 
+gen:year      12  1549.6   129.1   2.5203  0.003447 ** 
+gen:env       12  1314.2   109.5   2.1374  0.014427 *  
+year:env       1  5795.2  5795.2 113.1058 &lt; 2.2e-16 ***
+gen:year:env  12  1662.1   138.5   2.7033  0.001694 ** 
+Residuals    338 17318.1    51.2                       
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</code></pre>
+</div>
+</div>
+<p>I can fit my model and use <code>summary()</code> and <code>anova()</code> to get most of the sort of output I might be interested in. Everything runs - no errors - lots of highly significant p-values.</p>
+<p>But does anything look a bit odd here…? Because it should!</p>
+<p>The model is incorrect, and absolutely not what I wanted, but unless we knew <em>why</em> it would not be particularly obvious from what we have done here.</p>
+<p>Take a closer look at the model coefficients - the intercept of the model is -1900. There are some outrageously large looking estimates for some of the parameters when you go back and compare against the data where the range of yields goes from 15 to 65.</p>
+<p>The real give away is in the number of parameters, and degrees of freedom for <code>year</code> variable. This is being treated as if it is a continuous number I.e. it is assessing for a ‘one unit’ increase in year what would we expect to happen to yield. In reality, we would unquestionably be more interested in considering year as a factor for this analysis - considering each year as a separate group.</p>
+<p>The class of variable when it is used in a model is important! It will determine how it is being treated.</p>
+<p>Let’s just look at one site to show just how difference the models are here. It is very worthwhile being comfortable with basic data manipulation and plotting functions so you can start to explore your data in all sorts of different ways if and when you see something a little odd or unexpected.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb22"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>oats_data <span class="sc">%&gt;%</span></span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(gen<span class="sc">==</span><span class="st">"M"</span> <span class="sc">&amp;</span> env<span class="sc">==</span><span class="st">"Karnal"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(year) <span class="sc">%&gt;%</span></span>
+<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(<span class="at">yield=</span><span class="fu">mean</span>(yield)) <span class="sc">%&gt;%</span></span>
+<span id="cb22-5"><a href="#cb22-5" aria-hidden="true" tabindex="-1"></a>    <span class="fu">ggplot</span>(<span class="fu">aes</span>(<span class="at">y=</span>yield,<span class="at">x=</span>year))<span class="sc">+</span></span>
+<span id="cb22-6"><a href="#cb22-6" aria-hidden="true" tabindex="-1"></a>    <span class="fu">geom_point</span>(<span class="at">data=</span><span class="fu">filter</span>(oats_data,gen<span class="sc">==</span><span class="st">"M"</span> <span class="sc">&amp;</span> env<span class="sc">==</span><span class="st">"Karnal"</span>)) <span class="sc">+</span></span>
+<span id="cb22-7"><a href="#cb22-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_line</span>(<span class="at">col=</span><span class="st">"red"</span>)<span class="sc">+</span></span>
+<span id="cb22-8"><a href="#cb22-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_smooth</span>(<span class="at">method=</span><span class="st">"lm"</span>,<span class="at">col=</span><span class="st">"blue"</span>,<span class="at">se=</span><span class="cn">FALSE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<p><img src="improved-code_files/figure-html/unnamed-chunk-15-1.png" class="img-fluid" width="672"></p>
+</div>
+</div>
+<p>The blue line is what is being fitted in the previous model - considering the year on year trend as a linear effect. But for genotype A this is very inappropriate! It reduced from 1932-33 and then increased from 1933-34 - very much not a linear effect. And with just 3 years we would be incredibly stupid to even consider fitting a non-linear effect of year.</p>
+<p>So with a trial like this we are not interested in looking at the year on year trend as a continuous trend - we are considering the three years as being representative of different environmental conditions. Even though year is a number we do not want to treat it as such - instead we should be treating it as a factor. Even though we created a model with no errors/warnings and lots of significant p-values, it was ultimately completely useless.</p>
+<p>So let’s try again:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb23"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a>oats_data<span class="ot">&lt;-</span><span class="fu">mutate</span>(oats_data,<span class="at">year_factor=</span><span class="fu">factor</span>(year))</span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a>model2<span class="ot">&lt;-</span>  <span class="fu">lm</span>(yield<span class="sc">~</span>gen<span class="sc">*</span>year_factor<span class="sc">*</span>env,<span class="at">data=</span>oats_data)</span>
+<span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb23-5"><a href="#cb23-5" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(model2)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Call:
+lm(formula = yield ~ gen * year_factor * env, data = oats_data)
+
+Residuals:
+   Min     1Q Median     3Q    Max 
+ -13.0   -3.7   -0.2    3.4   14.7 
+
+Coefficients:
+                             Estimate Std. Error t value Pr(&gt;|t|)    
+(Intercept)                    29.300      2.696  10.867  &lt; 2e-16 ***
+genH                            7.200      3.813   1.888 0.059923 .  
+genA                           12.000      3.813   3.147 0.001809 ** 
+genK                           10.100      3.813   2.649 0.008490 ** 
+genI                            3.500      3.813   0.918 0.359387    
+genF                            5.100      3.813   1.337 0.182036    
+genD                           11.300      3.813   2.963 0.003276 ** 
+genE                            6.400      3.813   1.678 0.094266 .  
+genG                           14.400      3.813   3.776 0.000190 ***
+genJ                           15.000      3.813   3.934 0.000103 ***
+genC                           12.800      3.813   3.357 0.000886 ***
+genL                            2.500      3.813   0.656 0.512543    
+genM                            6.300      3.813   1.652 0.099500 .  
+year_factor1933                -3.200      3.813  -0.839 0.401993    
+year_factor1934                 1.900      3.813   0.498 0.618636    
+envPusa                        -4.600      3.813  -1.206 0.228590    
+genH:year_factor1933            2.700      5.393   0.501 0.616941    
+genA:year_factor1933           -1.500      5.393  -0.278 0.781072    
+genK:year_factor1933            2.300      5.393   0.427 0.670027    
+genI:year_factor1933            6.000      5.393   1.113 0.266716    
+genF:year_factor1933            6.300      5.393   1.168 0.243586    
+genD:year_factor1933            6.100      5.393   1.131 0.258843    
+genE:year_factor1933           11.100      5.393   2.058 0.040382 *  
+genG:year_factor1933            9.700      5.393   1.799 0.073020 .  
+genJ:year_factor1933           12.600      5.393   2.337 0.020095 *  
+genC:year_factor1933            8.800      5.393   1.632 0.103713    
+genL:year_factor1933           27.300      5.393   5.063 7.09e-07 ***
+genM:year_factor1933           25.100      5.393   4.655 4.81e-06 ***
+genH:year_factor1934           -1.600      5.393  -0.297 0.766888    
+genA:year_factor1934            0.200      5.393   0.037 0.970438    
+genK:year_factor1934           -1.000      5.393  -0.185 0.853003    
+genI:year_factor1934            8.600      5.393   1.595 0.111770    
+genF:year_factor1934            5.600      5.393   1.038 0.299855    
+genD:year_factor1934           -1.500      5.393  -0.278 0.781072    
+genE:year_factor1934            5.100      5.393   0.946 0.345007    
+genG:year_factor1934           -2.000      5.393  -0.371 0.710977    
+genJ:year_factor1934           -4.100      5.393  -0.760 0.447644    
+genC:year_factor1934           -0.300      5.393  -0.056 0.955670    
+genL:year_factor1934           10.000      5.393   1.854 0.064623 .  
+genM:year_factor1934           13.100      5.393   2.429 0.015693 *  
+genH:envPusa                   -9.700      5.393  -1.799 0.073020 .  
+genA:envPusa                  -11.200      5.393  -2.077 0.038625 *  
+genK:envPusa                   -7.600      5.393  -1.409 0.159726    
+genI:envPusa                   -4.900      5.393  -0.909 0.364230    
+genF:envPusa                    5.000      5.393   0.927 0.354536    
+genD:envPusa                   -9.700      5.393  -1.799 0.073020 .  
+genE:envPusa                   -0.200      5.393  -0.037 0.970438    
+genG:envPusa                   -8.900      5.393  -1.650 0.099862 .  
+genJ:envPusa                   -7.900      5.393  -1.465 0.143931    
+genC:envPusa                  -13.100      5.393  -2.429 0.015693 *  
+genL:envPusa                   17.100      5.393   3.171 0.001670 ** 
+genM:envPusa                    1.200      5.393   0.223 0.824047    
+year_factor1933:envPusa         7.900      5.393   1.465 0.143931    
+year_factor1934:envPusa         8.300      5.393   1.539 0.124778    
+genH:year_factor1933:envPusa    4.400      7.626   0.577 0.564384    
+genA:year_factor1933:envPusa    5.300      7.626   0.695 0.487590    
+genK:year_factor1933:envPusa    3.000      7.626   0.393 0.694307    
+genI:year_factor1933:envPusa   19.700      7.626   2.583 0.010244 *  
+genF:year_factor1933:envPusa    4.500      7.626   0.590 0.555570    
+genD:year_factor1933:envPusa    8.000      7.626   1.049 0.294983    
+genE:year_factor1933:envPusa   -0.400      7.626  -0.052 0.958203    
+genG:year_factor1933:envPusa    9.800      7.626   1.285 0.199730    
+genJ:year_factor1933:envPusa    7.600      7.626   0.997 0.319748    
+genC:year_factor1933:envPusa   21.200      7.626   2.780 0.005768 ** 
+genL:year_factor1933:envPusa  -24.000      7.626  -3.147 0.001809 ** 
+genM:year_factor1933:envPusa   -4.800      7.626  -0.629 0.529542    
+genH:year_factor1934:envPusa   17.700      7.626   2.321 0.020934 *  
+genA:year_factor1934:envPusa   11.400      7.626   1.495 0.135965    
+genK:year_factor1934:envPusa    9.400      7.626   1.233 0.218656    
+genI:year_factor1934:envPusa    8.700      7.626   1.141 0.254827    
+genF:year_factor1934:envPusa   -5.200      7.626  -0.682 0.495834    
+genD:year_factor1934:envPusa   14.900      7.626   1.954 0.051619 .  
+genE:year_factor1934:envPusa    7.900      7.626   1.036 0.301050    
+genG:year_factor1934:envPusa   17.700      7.626   2.321 0.020934 *  
+genJ:year_factor1934:envPusa   18.200      7.626   2.387 0.017605 *  
+genC:year_factor1934:envPusa   33.600      7.626   4.406 1.45e-05 ***
+genL:year_factor1934:envPusa   -5.000      7.626  -0.656 0.512543    
+genM:year_factor1934:envPusa    8.300      7.626   1.088 0.277279    
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+Residual standard error: 6.029 on 312 degrees of freedom
+Multiple R-squared:  0.7847,    Adjusted R-squared:  0.7316 
+F-statistic: 14.77 on 77 and 312 DF,  p-value: &lt; 2.2e-16</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb25"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a><span class="fu">anova</span>(model2)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Analysis of Variance Table
+
+Response: yield
+                     Df  Sum Sq Mean Sq  F value    Pr(&gt;F)    
+gen                  12 12297.2  1024.8  28.1921 &lt; 2.2e-16 ***
+year_factor           2 14475.3  7237.6 199.1133 &lt; 2.2e-16 ***
+env                   1   345.4   345.4   9.5010 0.0022368 ** 
+gen:year_factor      24  3839.0   160.0   4.4006 3.021e-10 ***
+gen:env              12  1314.2   109.5   3.0128 0.0005133 ***
+year_factor:env       2  5945.6  2972.8  81.7842 &lt; 2.2e-16 ***
+gen:year_factor:env  24  3123.5   130.1   3.5804 1.051e-07 ***
+Residuals           312 11341.0    36.3                       
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</code></pre>
+</div>
+</div>
+<p>The output should look pretty different here!</p>
+<p>Everything is significant… For a proper analysis of this data I would probably start checking model assumptions, and that would lead me to wanting to extend this model to also account for the blocking effect using a mixed model. But to keep things a bit more straightforward within this session today, I will temporarily forget about this for now, as we want to keep today a little bit more R-focused than stats-focused!</p>
+<p>But that does mean I should at least try to make sense of this model we have got to and working out why everything is statistically significant - and in particular that 3 way interaction. Multi-way interactions can be quite tricky to unpack, so we need all the help we can get from R!</p>
+</section>
+<section id="tip-5---using-the-emmeans-package-for-interrogating-models" class="level2">
+<h2 class="anchored" data-anchor-id="tip-5---using-the-emmeans-package-for-interrogating-models">Tip 5 - Using the emmeans package for interrogating models</h2>
+<p>When we have a model like this with lots of interactions it can be a bit confusing to unpack. The emmeans package has lots of ways of interrogating models for various post-hoc statistics and summaries.</p>
+<p>e.g.&nbsp;we can start out looking at the overall means / CIs.</p>
+<p>Since we have a balanced experiment the means should match what we saw back in the table we made earlier - but the confidence intervals will now be calculated in a much more robust way than if we had calculated them in a naive way. (Of course that is providing the model assumptions are valid - but that is probably a discussion for another time!).</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb27"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a><span class="fu">emmeans</span>(model2,<span class="sc">~</span>gen) </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code> gen emmean  SE  df lower.CL upper.CL
+ B     29.3 1.1 312     27.1     31.4
+ H     35.7 1.1 312     33.5     37.8
+ A     38.0 1.1 312     35.9     40.2
+ K     38.1 1.1 312     35.9     40.2
+ I     39.9 1.1 312     37.8     42.1
+ F     40.7 1.1 312     38.6     42.9
+ D     41.1 1.1 312     38.9     43.2
+ E     42.2 1.1 312     40.1     44.4
+ G     46.4 1.1 312     44.2     48.5
+ J     47.5 1.1 312     45.3     49.6
+ C     47.5 1.1 312     45.3     49.6
+ L     47.9 1.1 312     45.8     50.1
+ M     49.5 1.1 312     47.3     51.6
+
+Results are averaged over the levels of: year_factor, env 
+Confidence level used: 0.95 </code></pre>
+</div>
+</div>
+<p><code>emmip()</code> can be very flexible to give different layouts for “Interaction plots” with different factors used in different ways depending on how we use the ~ | and * . It takes a bit of trial and error but it can be really useful to see the same information presented in different ways and is usually easier than trying to work out the ggplot code yourself at this point</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb29"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a><span class="fu">emmip</span>(model2,<span class="sc">~</span>gen <span class="sc">|</span> year_factor<span class="sc">*</span>env) </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<p><img src="improved-code_files/figure-html/unnamed-chunk-18-1.png" class="img-fluid" width="672"></p>
+</div>
+</div>
+<p>I don’t think this is quite what I wanted, but can try a bit of trial and error of moving things around in the order to put the same numbers in a plot which can help me understand this 3 way interaction a little better!</p>
+<p>I think to me this is maybe the most helpful layout for helping to see why we are seeing interactions</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb30"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a><span class="fu">emmip</span>(model2,year_factor<span class="sc">~</span>gen <span class="sc">|</span>env,<span class="at">CIs=</span><span class="cn">TRUE</span>) </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<p><img src="improved-code_files/figure-html/unnamed-chunk-19-1.png" class="img-fluid" width="672"></p>
+</div>
+</div>
+<p>It shows why we have 2 way interactions: - Year * Env -&gt; Pusa 1932 is much lower yielding than other 2 years; Karnal 1932 generally similar to other years. - Env * Gen -&gt; Relatively small effect - generally those higher yield varieties are consistent from one site to another - Year * Gen -&gt; In both sites the differences between genotypes across years are larger for the higher yielding genotypes and smaller for the lower yielding genotypes.</p>
+<p>And some of the causes behind the 3 way interaction: - Genotype L is the main culprit here - in 1932 Low Yielding in Karnal and High Yielding in Pusa; In 1933 High Yielding in Karnal and Average Yielding in Pusa; In 1934 Above Average for Both Sites. F, C, I and M also playing a role in the 3 way interaction.</p>
+<p>The complicated multi-way interaction effect is being driven by variety L which is very different to anything else. In Karnal this is one of the best in 1933 and one of the worst in 1932. In Pusa this is by far the best in 1932 and among the best in 1933. So there is a three way effect there given this inconsistency between the two sites of the effect over the two years. We also see other things clearly - like the big year to year difference in Pusa, and only a small difference in Karnal, and that there are a good number of ‘consistently bad’ varieties that we can probably safely discard from further research.</p>
+<p>So we know have more of an understanding behind the ‘headlines’ that came through our analysis of variance table, and can start to talk about why all those interactions are coming out so strongly</p>
+</section>
+<section id="tip-6---making-everything-look-a-bit-nicer" class="level2">
+<h2 class="anchored" data-anchor-id="tip-6---making-everything-look-a-bit-nicer">Tip 6 - Making Everything Look A Bit Nicer!</h2>
+<p>This is something I have been trying to embed throughout this entire document by the way I am structuring my code chunks, the options I am using for plots, and the R markdown stylings I am using throughout. Throughout this document there are embedded things to make the output and structure easier to follow - like headers (using <code>#</code>), bullet points (using <code>-</code>) and making sure code is nicely laid out.</p>
+<p>All of these small changes make this document much easier to read, and to share the results and findings among your team (particularly those who are not R users, who would be turned off by raw computer output) so that it can be understood well. There are lots of great resources for reminding yourself of the notation in R markdown documents for different types of formatting, and there is also the option to use the relatively new “visual” code editor in RStudio if you do prefer to produce your documents code in that way.</p>
+</section>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button', {
+    text: function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+  });
+  clipboard.on('success', function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  });
+  function tippyHover(el, contentFn) {
+    const config = {
+      allowHTML: true,
+      content: contentFn,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start'
+    };
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      return note.innerHTML;
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+
+
+
+</body></html>
